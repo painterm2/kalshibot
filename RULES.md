@@ -55,9 +55,9 @@ raising it to $5-10 lets profitable strategies scale.
 
 ## Schedule
 
-A scheduled Claude session runs the bot once a day at about 10:45am New York time. It
-settles finished bets, places new ones, and commits `ledger-live.jsonl` to the repo so the
-bot's record survives between runs.
+Not scheduled yet: the bot trades only when someone runs `python3 -m kalshibot run --mode live`.
+Each run settles finished bets and places new ones. Commit `ledger-live.jsonl` after every
+run so the bot's record survives between runs. The growth step below needs someone to run it.
 
 ## Growth step
 
