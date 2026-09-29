@@ -4,6 +4,7 @@
   run [--mode M]     One pass of the weather strategy. M is dry-run (default), demo or live.
   fund AMOUNT        Record money you gave the bot this month (demo/live ledgers).
   status [--mode M]  The bot's positions and P&L from its ledger.
+  report [--days N]  Performance report (Markdown) from the live ledger; --out saves it to a file.
 """
 
 from __future__ import annotations
@@ -13,7 +14,9 @@ import os
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
-from kalshibot import bot
+from pathlib import Path
+
+from kalshibot import bot, report
 from kalshibot.kalshi import BASE_URLS, KalshiClient, KalshiError
 from kalshibot.rules import load_rules
 
@@ -47,6 +50,10 @@ def main(argv: list[str] | None = None) -> int:
     fund.add_argument("--mode", choices=("demo", "live"), default="live")
     status = sub.add_parser("status")
     status.add_argument("--mode", choices=bot.MODES, default="dry-run")
+    rep = sub.add_parser("report")
+    rep.add_argument("--mode", choices=bot.MODES, default="live")
+    rep.add_argument("--days", type=int, default=7)
+    rep.add_argument("--out", type=Path, help="also write the report to this file")
     args = parser.parse_args(argv)
 
     rules = load_rules()
@@ -76,6 +83,17 @@ def main(argv: list[str] | None = None) -> int:
               f"month ${state.realized_pnl_month:+.2f}, today ${state.realized_pnl_today:+.2f}")
         for p in state.open_positions:
             print(f"  open {p.ticker} {p.side.upper()} x{p.contracts}, at risk ${p.max_loss:.2f}")
+        return 0
+    if args.command == "report":
+        try:
+            cash = KalshiClient.from_env("prod").balance() if args.mode == "live" else None
+        except Exception:
+            cash = None
+        text = report.build_report(bot.ledger_for(args.mode).entries(), rules, now, args.days, cash)
+        if args.out:
+            args.out.parent.mkdir(parents=True, exist_ok=True)
+            args.out.write_text(text)
+        print(text)
         return 0
     return 1
 

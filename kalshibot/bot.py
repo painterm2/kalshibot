@@ -156,6 +156,8 @@ def execute(client: KalshiClient, ledger: Ledger, mode: str, cand: Candidate, co
         "type": "buy", "ts": now.isoformat(), "ticker": m.ticker, "event_ticker": m.event_ticker,
         "side": cand.side, "contracts": filled, "requested": contracts, "price": round(avg_price, 4),
         "cost": cost, "order_id": order_id, "simulated": mode == "dry-run",
+        "win_probability": round(cand.win_probability, 4), "model_probability": round(cand.model_probability, 4),
+        "forecast_high": cand.forecast.high_f, "lead_days": cand.forecast.lead_days,
     })
     return filled, cost
 
