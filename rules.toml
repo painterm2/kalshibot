@@ -1,0 +1,46 @@
+# Trading rules for kalshibot. Every order passes through kalshibot/risk.py,
+# which enforces these limits. See RULES.md for the reasoning behind each one.
+# All money values are in US dollars.
+
+[funding]
+# New money you give the bot each calendar month. The bot never deposits or
+# withdraws on its own; this is the most it will ever treat as new capital.
+monthly_budget = 100.00
+
+[losses]
+# Hard daily stop: realized losses today plus the worst case of every open
+# position can never exceed this. Resets at midnight (timezone below).
+daily_loss_limit = 5.00
+# Monthly stop: if the month's realized losses reach this, stop until next month.
+# Protects winnings carried over from earlier months.
+monthly_loss_limit = 100.00
+timezone = "America/New_York"
+
+[sizing]
+# Fraction of full Kelly to bet. 0.25 gives most of Kelly's growth with far
+# less variance and far less damage when the probability estimate is wrong.
+kelly_fraction = 0.25
+# Most any single order may risk (cost + fees).
+max_risk_per_trade = 2.00
+# Skip trades whose expected profit after fees is below this, per contract.
+min_edge_per_contract = 0.03
+
+[markets]
+# "Short-term bets": only markets that close within this many hours.
+max_hours_to_close = 48
+# Avoid extreme prices, where fees and rounding eat most of the edge.
+min_price = 0.05
+max_price = 0.95
+# At most this many open positions in the same event (correlated outcomes).
+max_positions_per_event = 1
+
+[fees]
+# Kalshi trading fee: ceil(rate * contracts * price * (1 - price)) to the cent.
+taker_fee_rate = 0.07
+
+[safety]
+# Real money is off until you flip this deliberately. Runs use the demo API.
+live_trading = false
+# If this file exists, the bot places no new orders.
+kill_switch_file = "STOP"
+max_orders_per_day = 20
