@@ -55,9 +55,18 @@ raising it to $5-10 lets profitable strategies scale.
 
 ## Schedule
 
-Not scheduled yet: the bot trades only when someone runs `python3 -m kalshibot run --mode live`.
-Each run settles finished bets and places new ones. Commit `ledger-live.jsonl` after every
-run so the bot's record survives between runs. The growth step below needs someone to run it.
+A scheduled Claude session (the "kalshibot live run (3x daily)" routine) runs the bot at
+9:47am, 1:47pm and 5:47pm New York time. Each run settles finished bets, places new ones,
+checks the account's positions against the bot's ledger (creating `STOP` on any mismatch),
+and commits `ledger-live.jsonl` so the bot's record survives between runs. Pause it in
+claude.ai under Routines, or stop trading with `STOP` / `live_trading = false`.
+
+## Sharing the cash with you
+
+You can use the account's cash for your own trading whenever you like. The bot counts at
+most $100 a month as its own, and never bets more than the cash actually in the account,
+so if you spend some, it just has less to work with. With the $3 daily limit it rarely
+has more than a few dollars tied up at once.
 
 ## Growth step
 
