@@ -9,6 +9,7 @@ from kalshibot.risk import (
     OrderProposal,
     Position,
     check_order,
+    check_sell,
     order_cost,
     size_order,
     trading_fee,
@@ -87,7 +88,7 @@ class RiskTest(unittest.TestCase):
         self.assertFalse(decision.allowed)
 
     def test_per_trade_limit(self):
-        self.assertFalse(self.check(fresh_state(), order(contracts=6)).allowed)
+        self.assertFalse(self.check(fresh_state(), order(contracts=8)).allowed)
 
     def test_long_dated_market_rejected(self):
         self.assertFalse(self.check(fresh_state(), order(close_time=NOW + timedelta(days=5))).allowed)
@@ -111,6 +112,41 @@ class RiskTest(unittest.TestCase):
 
     def test_order_cap(self):
         self.assertFalse(self.check(fresh_state(orders_today=20), order()).allowed)
+
+    def test_stays_out_of_owner_markets(self):
+        decision = self.check(fresh_state(owner_tickers=frozenset({"MKT-A"})), order())
+        self.assertFalse(decision.allowed)
+        self.assertTrue(any("owner" in r for r in decision.reasons))
+
+    def sell(self, state, ticker="MKT-B", side="yes", contracts=3):
+        return check_sell(self.rules, state, ticker, side, contracts, live=False, kill_switch_dir=self.tmp.name)
+
+    def test_can_sell_own_contracts(self):
+        state = fresh_state(open_positions=[Position("MKT-B", "EVT-B", 1.5, side="yes", contracts=3)])
+        self.assertTrue(self.sell(state).allowed)
+
+    def test_cannot_sell_more_than_bot_holds(self):
+        # Owner may hold more in this market, but the bot only owns 3.
+        state = fresh_state(
+            open_positions=[Position("MKT-B", "EVT-B", 1.5, side="yes", contracts=3)],
+            owner_tickers=frozenset({"MKT-B"}),
+        )
+        self.assertFalse(self.sell(state, contracts=4).allowed)
+
+    def test_cannot_sell_owner_only_market(self):
+        state = fresh_state(owner_tickers=frozenset({"MKT-Z"}))
+        self.assertFalse(self.sell(state, ticker="MKT-Z", contracts=1).allowed)
+
+    def test_cannot_sell_other_side(self):
+        state = fresh_state(open_positions=[Position("MKT-B", "EVT-B", 1.5, side="yes", contracts=3)])
+        self.assertFalse(self.sell(state, side="no", contracts=1).allowed)
+
+    def test_sell_allowed_past_daily_loss_limit(self):
+        state = fresh_state(
+            realized_pnl_today=-5.0,
+            open_positions=[Position("MKT-B", "EVT-B", 1.5, side="yes", contracts=3)],
+        )
+        self.assertTrue(self.sell(state).allowed)
 
     def test_sizing_respects_caps(self):
         state = fresh_state()

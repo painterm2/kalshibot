@@ -11,6 +11,7 @@ them, and every order has to pass `check_order()` before it is sent.
 |---|---|---|
 | Monthly budget | $100 | The most new money the bot counts per calendar month. If you deposit more, the bot ignores the extra. |
 | Deposits and withdrawals | never | The bot only trades. Moving money in or out is always done by you. Its API key should have trading permission only. |
+| Your own trades | untouched | The account is shared with your own trading. The bot only sells contracts it bought itself, and it tracks them in its own ledger. It never trades a market where you hold a position, because Kalshi nets YES and NO within a market and a bot order there could close yours. Its budget and loss limits count only its own trades. |
 | Winnings | compound | Profits stay in the bankroll and raise future bet sizes. Long-term growth depends on this. |
 
 ## Loss limits
@@ -32,7 +33,7 @@ of results, raising it to about $10 lets profitable strategies scale.
 | Rule | Value | Why |
 |---|---|---|
 | Kelly fraction | 0.25 | Kelly sizing gives the fastest long-term growth *if* the probability estimates are right. Quarter Kelly keeps most of that growth with much smaller swings, and it forgives estimates that are too optimistic. Those are the most likely failure. |
-| Max risk per trade | $2 | No single bet can use up most of a day's loss budget. |
+| Max risk per trade | $2.50 | A single bet can use at most half of the day's loss budget. |
 | Minimum edge | $0.03/contract after fees | Kalshi fees are large relative to small bets. A bet that only looks good before fees is a losing bet. |
 
 ## Which markets
@@ -48,5 +49,5 @@ of results, raising it to about $10 lets profitable strategies scale.
 | Rule | Value | Why |
 |---|---|---|
 | Live trading | off | The bot runs on Kalshi's demo environment until you set `live_trading = true`. |
-| Kill switch | a file named `STOP` | Create it and the bot places no new orders. Delete it to resume. |
+| Kill switch | a file named `STOP` | Create it and the bot places no orders at all, buys or sells. Delete it to resume. |
 | Max orders per day | 20 | Catches runaway loops and bugs. |

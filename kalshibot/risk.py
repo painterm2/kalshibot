@@ -1,8 +1,13 @@
-"""Risk manager: every order must pass check_order() before it is sent.
+"""Risk manager: every order must pass check_order() or check_sell() before it is sent.
 
 Money is handled in dollars. Kalshi contracts pay $1.00 if they win and $0.00
 if they lose, so buying one contract at price p risks p (plus fees) to win 1 - p.
-Selling YES is modelled as buying NO at 1 - p, so every order here is a buy.
+New positions are always opened by buying YES or NO. Selling only ever closes
+contracts the bot itself bought.
+
+The account is shared with the owner's own trading. Everything in AccountState
+except cash_balance and owner_tickers covers the bot's own trades only, taken
+from the bot's ledger and not from the account totals.
 """
 
 from __future__ import annotations
@@ -22,6 +27,8 @@ class Position:
     # Most this position can still lose: what was paid for it (incl. fees)
     # minus anything already recovered by partial sells.
     max_loss: float
+    side: str = "yes"
+    contracts: int = 1
 
 
 @dataclass
@@ -31,12 +38,17 @@ class AccountState:
     # Money you added, keyed by "YYYY-MM". Anything over the monthly budget
     # in a month is ignored: the bot never trades with it.
     contributions: dict[str, float]
-    # Realized P&L (after fees) over the bot's lifetime, this month, and today.
+    # The bot's realized P&L (after fees) over its lifetime, this month, and today.
     realized_pnl_lifetime: float
     realized_pnl_month: float
     realized_pnl_today: float
+    # Positions the bot opened (from its own ledger, never the account totals).
     open_positions: list[Position] = field(default_factory=list)
     orders_today: int = 0
+    # Markets where the owner holds contracts of their own. The bot stays out
+    # of them, because Kalshi nets YES and NO in a market and a bot order
+    # there could close or change the owner's position.
+    owner_tickers: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True)
@@ -148,6 +160,8 @@ def check_order(
     same_event = sum(1 for p in state.open_positions if p.event_ticker == order.event_ticker)
     if same_event >= rules.max_positions_per_event:
         reasons.append(f"already {same_event} open position(s) in {order.event_ticker}")
+    if order.ticker in state.owner_tickers:
+        reasons.append(f"owner holds a position in {order.ticker}")
 
     if order.contracts > 0:
         edge = order.win_probability - order.price - fee / order.contracts
@@ -156,5 +170,35 @@ def check_order(
                 f"expected edge ${edge:.3f}/contract after fees "
                 f"(minimum ${rules.min_edge_per_contract:.3f})"
             )
+
+    return Decision(allowed=not reasons, reasons=tuple(reasons))
+
+
+def check_sell(
+    rules: Rules,
+    state: AccountState,
+    ticker: str,
+    side: str,
+    contracts: int,
+    live: bool,
+    kill_switch_dir: Path | str = ".",
+) -> Decision:
+    """Allow a sell only of contracts the bot bought and still holds.
+
+    Loss limits don't apply: selling can only shrink the bot's risk.
+    """
+    reasons: list[str] = []
+    held = sum(p.contracts for p in state.open_positions if p.ticker == ticker and p.side == side)
+
+    if (Path(kill_switch_dir) / rules.kill_switch_file).exists():
+        reasons.append("kill switch is on")
+    if live and not rules.live_trading:
+        reasons.append("live trading is disabled in rules.toml")
+    if state.orders_today >= rules.max_orders_per_day:
+        reasons.append(f"already placed {state.orders_today} orders today")
+    if contracts <= 0:
+        reasons.append("order has no contracts")
+    elif contracts > held:
+        reasons.append(f"bot holds only {held} {side.upper()} in {ticker}; it never sells the owner's contracts")
 
     return Decision(allowed=not reasons, reasons=tuple(reasons))

@@ -21,7 +21,7 @@ timezone = "America/New_York"
 # less variance and far less damage when the probability estimate is wrong.
 kelly_fraction = 0.25
 # Most any single order may risk (cost + fees).
-max_risk_per_trade = 2.00
+max_risk_per_trade = 2.50
 # Skip trades whose expected profit after fees is below this, per contract.
 min_edge_per_contract = 0.03
 
