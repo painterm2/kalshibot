@@ -3,3 +3,4 @@ __pycache__/
 .env
 *.pem
 STOP
+ledger-*.jsonl
