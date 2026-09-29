@@ -61,6 +61,8 @@ class OrderProposal:
     # The strategy's estimate that the side being bought wins.
     win_probability: float
     close_time: datetime
+    # Kalshi's category for the market's series, e.g. "Climate and Weather".
+    category: str
 
 
 @dataclass(frozen=True)
@@ -160,6 +162,11 @@ def check_order(
     same_event = sum(1 for p in state.open_positions if p.event_ticker == order.event_ticker)
     if same_event >= rules.max_positions_per_event:
         reasons.append(f"already {same_event} open position(s) in {order.event_ticker}")
+    excluded = {c.strip().lower() for c in rules.excluded_categories}
+    if not order.category.strip():
+        reasons.append("market has no category, so it can't be checked against excluded categories")
+    elif order.category.strip().lower() in excluded:
+        reasons.append(f"{order.category} markets are off limits")
     if order.ticker in state.owner_tickers:
         reasons.append(f"owner holds a position in {order.ticker}")
 

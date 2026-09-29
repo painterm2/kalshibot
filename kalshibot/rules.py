@@ -22,6 +22,7 @@ class Rules:
     min_price: float
     max_price: float
     max_positions_per_event: int
+    excluded_categories: tuple[str, ...]
     taker_fee_rate: float
     live_trading: bool
     kill_switch_file: str
@@ -59,6 +60,7 @@ def load_rules(path: Path | str = DEFAULT_RULES_PATH) -> Rules:
         min_price=raw["markets"]["min_price"],
         max_price=raw["markets"]["max_price"],
         max_positions_per_event=raw["markets"]["max_positions_per_event"],
+        excluded_categories=tuple(raw["markets"]["excluded_categories"]),
         taker_fee_rate=raw["fees"]["taker_fee_rate"],
         live_trading=raw["safety"]["live_trading"],
         kill_switch_file=raw["safety"]["kill_switch_file"],

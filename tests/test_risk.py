@@ -39,6 +39,7 @@ def order(**overrides):
         contracts=4,
         win_probability=0.55,
         close_time=NOW + timedelta(hours=6),
+        category="Climate and Weather",
     )
     return replace(base, **overrides)
 
@@ -112,6 +113,15 @@ class RiskTest(unittest.TestCase):
 
     def test_order_cap(self):
         self.assertFalse(self.check(fresh_state(orders_today=20), order()).allowed)
+
+    def test_sports_rejected(self):
+        for category in ("Sports", "sports", " SPORTS "):
+            decision = self.check(fresh_state(), order(category=category))
+            self.assertFalse(decision.allowed, category)
+            self.assertTrue(any("off limits" in r for r in decision.reasons))
+
+    def test_missing_category_rejected(self):
+        self.assertFalse(self.check(fresh_state(), order(category="")).allowed)
 
     def test_stays_out_of_owner_markets(self):
         decision = self.check(fresh_state(owner_tickers=frozenset({"MKT-A"})), order())

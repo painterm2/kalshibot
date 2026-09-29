@@ -42,6 +42,7 @@ of results, raising it to about $10 lets profitable strategies scale.
 |---|---|---|
 | Time to close | 48 hours or less | Short-term bets only. Money turns over quickly, and results arrive quickly enough to judge the strategy. |
 | Price range | $0.05 to $0.95 | At extreme prices, fees and cent rounding eat most of the edge. Longshots are also where people misjudge the odds most. |
+| Excluded categories | Sports | You trade sports yourself, so the bot stays out entirely. A market with no category is skipped too, so nothing gets through by accident. |
 | Positions per event | 1 | Markets in the same event usually move together. Two bets there are really one bigger bet. |
 
 ## Safety switches
