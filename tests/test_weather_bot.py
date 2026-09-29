@@ -137,7 +137,11 @@ class ModelTest(unittest.TestCase):
 
     def test_blend_pulls_toward_market(self):
         m = Market.from_api(market("M", "greater", 80, yes_bid=40, yes_ask=42))
-        self.assertAlmostEqual(weather.blended_probability(0.80, m, weight=0.5), 0.605)
+        self.assertAlmostEqual(weather.blended_probability(0.60, m, weight=0.5), 0.505)
+
+    def test_big_disagreement_with_market_is_skipped(self):
+        m = Market.from_api(market("M", "greater", 80, yes_bid=40, yes_ask=42))
+        self.assertIsNone(weather.blended_probability(0.80, m))
 
     def test_climate_day_uses_standard_time(self):
         start = weather.standard_day_start(weather.STATIONS[0], date(2026, 7, 1))
@@ -151,9 +155,9 @@ class BotTest(unittest.TestCase):
         self.addCleanup(tmp.cleanup)
         self.dir = Path(tmp.name)
         self.logs = []
-        # NWS says 85F tomorrow; the market prices "above 80" at only 42c.
+        # NWS says 85F tomorrow; the market prices "81 or above" at only 72c.
         self.nyc = [
-            market("KXHIGHNY-26SEP30-T80", "greater", floor=80, yes_bid=40, yes_ask=42),
+            market("KXHIGHNY-26SEP30-T80", "greater", floor=80, yes_bid=70, yes_ask=72),
             market("KXHIGHNY-26SEP30-B84.5", "between", 84, 85, yes_bid=20, yes_ask=22),
         ]
         self.fetch = fake_nws({"2026-09-29": 80, "2026-09-30": 85})
@@ -196,7 +200,7 @@ class BotTest(unittest.TestCase):
         self.run_bot(transport, "demo", ledger)
         self.assertEqual(len(transport.orders), 1)
         order = transport.orders[0]
-        self.assertEqual((order["action"], order["side"], order["yes_price"]), ("buy", "yes", 42))
+        self.assertEqual((order["action"], order["side"], order["yes_price"]), ("buy", "yes", 72))
         self.assertEqual(order["time_in_force"], "immediate_or_cancel")
         self.assertEqual(ledger.open_positions()[0].contracts, order["count"])
 
@@ -206,6 +210,11 @@ class BotTest(unittest.TestCase):
         ledger = self.run_bot(transport)
         self.assertFalse(any(e["type"] == "buy" for e in ledger.entries()))
         self.assertTrue(any("owner holds a position" in line for line in self.logs))
+
+    def test_same_day_markets_are_left_alone(self):
+        today = [market("KXHIGHNY-26SEP29-T79", "greater", floor=79, yes_bid=45, yes_ask=47, event="KXHIGHNY-26SEP29")]
+        ledger = self.run_bot(FakeTransport({"KXHIGHNY": today}))
+        self.assertFalse(any(e["type"] == "buy" for e in ledger.entries()))
 
     def test_kill_switch(self):
         (self.dir / self.rules.kill_switch_file).touch()

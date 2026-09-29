@@ -49,6 +49,12 @@ STATIONS = (
 SIGMA_BY_LEAD_DAYS = {0: 2.5, 1: 3.0, 2: 3.5}
 # How much to trust the model over the market price. 1.0 ignores the market.
 MODEL_WEIGHT = 0.6
+# Skip a market when the model and the market mid differ by more than this. A gap
+# that big almost always means the market knows something the model doesn't.
+MAX_DISAGREEMENT = 0.25
+# Days ahead the bot trades. Same-day markets (0) are left alone: by the afternoon,
+# traders watching minute-by-minute readings know the high, and a morning forecast can't compete.
+TRADE_LEAD_DAYS = (1, 2)
 
 _MONTHS = {m: i for i, m in enumerate(
     ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"], 1)}
@@ -98,11 +104,19 @@ def yes_probability(market: Market, mean: float, sigma: float, observed_floor: i
     return min(1.0, max(0.0, p))
 
 
-def blended_probability(model_p: float, market: Market, weight: float = MODEL_WEIGHT) -> float:
-    """Pull the model toward the market mid, when there is one."""
+def market_mid(market: Market) -> float | None:
     if market.yes_bid is None or market.yes_ask is None or market.yes_ask <= 0:
+        return None
+    return (market.yes_bid + market.yes_ask) / 2
+
+
+def blended_probability(model_p: float, market: Market, weight: float = MODEL_WEIGHT) -> float | None:
+    """Pull the model toward the market mid. None when they disagree too much to trust the model."""
+    mid = market_mid(market)
+    if mid is None:
         return model_p
-    mid = (market.yes_bid + market.yes_ask) / 2
+    if abs(model_p - mid) > MAX_DISAGREEMENT:
+        return None
     return weight * model_p + (1 - weight) * mid
 
 
@@ -180,7 +194,7 @@ def build_forecast(station: Station, day: date, now: datetime, fetch: Fetch = re
     highs = forecast_highs(station, fetch) if highs is None else highs
     today = now.astimezone(ZoneInfo(station.tz)).date()
     lead = (day - today).days
-    if lead < 0:
+    if lead not in TRADE_LEAD_DAYS:
         return None
     observed = observed_max(station, day, now, fetch) if lead == 0 else None
     if day not in highs:

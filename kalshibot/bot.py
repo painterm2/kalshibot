@@ -113,6 +113,8 @@ def find_candidates(rules: Rules, client: KalshiClient, now: datetime, log,
                 if model_p is None:
                     continue
                 p_yes = weather.blended_probability(model_p, m)
+                if p_yes is None:
+                    continue
                 for side, win_p in (("yes", p_yes), ("no", 1 - p_yes)):
                     price = m.ask(side)
                     if price is None or not 0 < price < 1:

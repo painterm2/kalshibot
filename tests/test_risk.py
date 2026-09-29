@@ -71,13 +71,13 @@ class RiskTest(unittest.TestCase):
         self.assertEqual(usable_capital(self.rules, state), 130.0)
 
     def test_daily_limit_counts_open_positions(self):
-        state = fresh_state(open_positions=[Position("MKT-B", "EVT-B", 2.0), Position("MKT-C", "EVT-C", 2.0)])
-        decision = self.check(state, order())  # 4.00 + 1.67 > 5.00
+        state = fresh_state(open_positions=[Position("MKT-B", "EVT-B", 1.0), Position("MKT-C", "EVT-C", 1.0)])
+        decision = self.check(state, order())  # 2.00 + 1.67 > 3.00
         self.assertFalse(decision.allowed)
         self.assertTrue(any("at risk today" in r for r in decision.reasons))
 
     def test_daily_limit_counts_realized_losses(self):
-        decision = self.check(fresh_state(realized_pnl_today=-4.0), order())
+        decision = self.check(fresh_state(realized_pnl_today=-2.0), order())
         self.assertFalse(decision.allowed)
 
     def test_gains_today_do_not_raise_the_limit(self):

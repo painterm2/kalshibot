@@ -10,7 +10,7 @@ monthly_budget = 100.00
 [losses]
 # Hard daily stop: realized losses today plus the worst case of every open
 # position can never exceed this. Resets at midnight (timezone below).
-daily_loss_limit = 5.00
+daily_loss_limit = 3.00
 # Monthly stop: if the month's realized losses reach this, stop until next month.
 # Protects winnings carried over from earlier months.
 monthly_loss_limit = 100.00
