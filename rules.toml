@@ -43,7 +43,7 @@ taker_fee_rate = 0.07
 
 [safety]
 # Real money is off until you flip this deliberately. Runs use the demo API.
-live_trading = false
+live_trading = true
 # If this file exists, the bot places no new orders.
 kill_switch_file = "STOP"
 max_orders_per_day = 20

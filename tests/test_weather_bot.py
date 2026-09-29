@@ -1,6 +1,7 @@
 import base64
 import tempfile
 import unittest
+from dataclasses import replace
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
@@ -44,12 +45,15 @@ class FakeTransport:
     def __call__(self, method, url, headers, params, body):
         self.headers.append(headers)
         path = url.split("/trade-api/v2", 1)[1]
-        if method == "POST" and path == "/portfolio/orders":
+        if method == "POST" and path == "/portfolio/events/orders":
             self.orders.append(body)
-            return 201, {"order": {"order_id": f"o{len(self.orders)}", "status": "executed"}}
+            return 201, {"order_id": f"o{len(self.orders)}", "fill_count": f"{float(body['count']):.2f}",
+                         "remaining_count": "0.00", "ts_ms": 0}
         if path == "/portfolio/fills":
             body = self.orders[int(params["order_id"][1:]) - 1]
-            return 200, {"fills": [{"count": body["count"], f"{body['side']}_price": body[f"{body['side']}_price"]}]}
+            yes = float(body["price"])
+            return 200, {"fills": [{"count_fp": f"{float(body['count']):.2f}", "yes_price_dollars": f"{yes:.4f}",
+                                    "no_price_dollars": f"{1 - yes:.4f}", "fee_cost": "0.0200"}]}
         if path == "/portfolio/balance":
             return 200, {"balance": 12345}
         if path == "/portfolio/positions":
@@ -186,6 +190,7 @@ class BotTest(unittest.TestCase):
         self.assertTrue(any("already 1 open position" in line for line in self.logs))
 
     def test_live_mode_blocked_while_live_trading_off(self):
+        self.rules = replace(self.rules, live_trading=False)
         transport = FakeTransport({"KXHIGHNY": self.nyc})
         ledger = Ledger(self.dir / "ledger-live.jsonl")
         ledger.fund("2026-09", 100.0, NOW)
@@ -200,9 +205,16 @@ class BotTest(unittest.TestCase):
         self.run_bot(transport, "demo", ledger)
         self.assertEqual(len(transport.orders), 1)
         order = transport.orders[0]
-        self.assertEqual((order["action"], order["side"], order["yes_price"]), ("buy", "yes", 72))
+        self.assertEqual((order["side"], order["price"]), ("bid", "0.7200"))
         self.assertEqual(order["time_in_force"], "immediate_or_cancel")
-        self.assertEqual(ledger.open_positions()[0].contracts, order["count"])
+        position = ledger.open_positions()[0]
+        self.assertEqual(position.contracts, int(order["count"]))
+        self.assertAlmostEqual(position.max_loss, round(position.contracts * 0.72 + 0.02, 2))
+
+    def test_buying_no_is_an_ask_on_the_yes_book(self):
+        transport = FakeTransport({})
+        KalshiClient("demo", "key-id", PEM, transport).buy("M", "no", 3, 0.30)
+        self.assertEqual((transport.orders[0]["side"], transport.orders[0]["price"]), ("ask", "0.7000"))
 
     def test_skips_owner_markets(self):
         transport = FakeTransport({"KXHIGHNY": self.nyc[:1]},

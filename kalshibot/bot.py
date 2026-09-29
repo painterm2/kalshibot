@@ -131,16 +131,27 @@ def execute(client: KalshiClient, ledger: Ledger, mode: str, cand: Candidate, co
             rules: Rules, now: datetime) -> tuple[int, float]:
     """Place (or paper-trade) the order. Returns contracts filled and total cost."""
     m = cand.market
+    fee = None
     if mode == "dry-run":
         filled, avg_price, order_id = contracts, cand.price, None
     else:
         order = client.buy(m.ticker, cand.side, contracts, cand.price)
         order_id = order.get("order_id")
-        fills = client.fills(order_id) if order_id else []
-        filled = int(sum(contract_count(f, "count") for f in fills))
-        spent = sum(contract_count(f, "count") * (price_dollars(f, f"{cand.side}_price") or cand.price) for f in fills)
-        avg_price = spent / filled if filled else cand.price
-    cost = round(filled * avg_price + (trading_fee(rules, filled, avg_price) if filled else 0), 2)
+        filled = round(contract_count(order, "fill_count"))
+        # Fills give the exact price and fee. If they can't be read or haven't caught up,
+        # book the fill at the limit price, which can only overstate what was paid.
+        avg_price, fee = cand.price, None
+        try:
+            fills = client.fills(order_id) if filled and order_id else []
+            if fills and round(sum(contract_count(f, "count") for f in fills)) == filled:
+                avg_price = sum(contract_count(f, "count") * price_dollars(f, f"{cand.side}_price")
+                                for f in fills) / filled
+                fee = sum(float(f.get("fee_cost") or 0) for f in fills)
+        except Exception:
+            pass
+    if mode == "dry-run" or fee is None:
+        fee = trading_fee(rules, filled, avg_price) if filled else 0.0
+    cost = round(filled * avg_price + fee, 2)
     ledger.append({
         "type": "buy", "ts": now.isoformat(), "ticker": m.ticker, "event_ticker": m.event_ticker,
         "side": cand.side, "contracts": filled, "requested": contracts, "price": round(avg_price, 4),

@@ -3,4 +3,5 @@ __pycache__/
 .env
 *.pem
 STOP
-ledger-*.jsonl
+ledger-dry-run.jsonl
+ledger-demo.jsonl

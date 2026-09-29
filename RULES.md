@@ -49,6 +49,24 @@ raising it to $5-10 lets profitable strategies scale.
 
 | Rule | Value | Why |
 |---|---|---|
-| Live trading | off | The bot runs on Kalshi's demo environment until you set `live_trading = true`. |
+| Live trading | on (since 2026-09-29) | Set `live_trading = false` in `rules.toml` to stop real-money orders. |
 | Kill switch | a file named `STOP` | Create it and the bot places no orders at all, buys or sells. Delete it to resume. |
 | Max orders per day | 20 | Catches runaway loops and bugs. |
+
+## Schedule
+
+A scheduled Claude session runs the bot once a day at about 10:45am New York time. It
+settles finished bets, places new ones, and commits `ledger-live.jsonl` to the repo so the
+bot's record survives between runs.
+
+## Growth step
+
+Once, after the bot has traded live for 14 days (from 2026-09-29), the scheduled run checks
+its realized P&L over those 14 days, after fees. If it is above $0:
+
+- `daily_loss_limit` goes from $3 to $5. `max_risk_per_trade` stays at $2.50.
+- The bot adds more Kalshi daily high temperature markets: any other city whose series
+  settles on an NWS Daily Climate Report, priced by the same model, with tests.
+
+If P&L is $0 or below, nothing changes and the run reports the result instead. Any growth
+beyond this one step is your call, not the bot's.

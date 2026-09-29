@@ -211,16 +211,23 @@ class KalshiClient:
     # The only call that moves money. bot.py gates it behind check_order().
 
     def buy(self, ticker: str, side: str, contracts: int, price: float, client_order_id: str | None = None) -> dict:
-        """Immediate-or-cancel limit buy: fills what it can at `price` or better, never rests."""
-        cents = round(price * 100)
+        """Immediate-or-cancel limit buy of YES or NO: fills what it can at `price` or better, never rests.
+
+        The V2 order endpoint quotes everything on the YES book: buying YES at p is a
+        bid at p, and buying NO at q is an ask (a YES sell) at 1 - q. The bot only
+        opens positions in markets where the account holds nothing, so an ask there
+        always opens a NO position rather than closing a YES one.
+        """
+        if side not in ("yes", "no"):
+            raise ValueError("side must be yes or no")
+        yes_price = price if side == "yes" else 1 - price
         body = {
             "ticker": ticker,
-            "action": "buy",
-            "side": side,
-            "count": contracts,
-            "type": "limit",
-            f"{side}_price": cents,
+            "side": "bid" if side == "yes" else "ask",
+            "count": str(contracts),
+            "price": f"{yes_price:.4f}",
             "time_in_force": "immediate_or_cancel",
+            "self_trade_prevention_type": "taker_at_cross",
             "client_order_id": client_order_id or str(uuid.uuid4()),
         }
-        return self.request("POST", "/portfolio/orders", body=body)["order"]
+        return self.request("POST", "/portfolio/events/orders", body=body)

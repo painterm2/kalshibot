@@ -108,7 +108,8 @@ class RiskTest(unittest.TestCase):
         Path(self.tmp.name, self.rules.kill_switch_file).touch()
         self.assertFalse(self.check(fresh_state(), order()).allowed)
 
-    def test_live_trading_off_by_default(self):
+    def test_live_orders_refused_while_live_trading_off(self):
+        self.rules = replace(self.rules, live_trading=False)
         self.assertFalse(self.check(fresh_state(), order(), live=True).allowed)
 
     def test_order_cap(self):
