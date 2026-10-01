@@ -55,7 +55,7 @@ raising it to $5-10 lets profitable strategies scale.
 
 ## Schedule
 
-A scheduled Claude session (the "kalshibot live run (3x daily)" routine) runs the bot at
+The "kalshibot live run (3x daily, runner)" routine wakes the "kalshibot runner" session at
 9:47am, 1:47pm and 5:47pm New York time. Each run settles finished bets, places new ones,
 checks the account's positions against the bot's ledger (creating `STOP` on any mismatch),
 and commits `ledger-live.jsonl` so the bot's record survives between runs. Pause it in
