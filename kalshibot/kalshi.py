@@ -183,8 +183,15 @@ class KalshiClient:
 
     # Read-only calls.
 
-    def balance(self) -> float:
+    def balance(self, exchange_index: int | None = None) -> float:
+        """Cash in the account. Kalshi splits cash into one pot per exchange, and an order
+        can only spend the pot of its market's exchange, so pass `exchange_index` to read that pot."""
         data = self.request("GET", "/portfolio/balance")
+        if exchange_index is not None and data.get("balance_breakdown") is not None:
+            for pot in data["balance_breakdown"]:
+                if pot.get("exchange_index") == exchange_index:
+                    return float(pot.get("balance") or 0)
+            return 0.0
         return price_dollars(data, "balance") or 0.0
 
     def positions(self) -> dict[str, float]:
@@ -197,6 +204,10 @@ class KalshiClient:
 
     def series_category(self, series_ticker: str) -> str:
         return self.request("GET", f"/series/{series_ticker}")["series"].get("category", "")
+
+    def series_exchange_index(self, series_ticker: str) -> int | None:
+        """Which exchange (and so which cash pot) the series trades on."""
+        return self.request("GET", f"/series/{series_ticker}")["series"].get("exchange_index")
 
     def markets(self, series_ticker: str, status: str = "open") -> list[Market]:
         rows = self._paged("/markets", "markets", {"series_ticker": series_ticker, "status": status, "limit": 200})

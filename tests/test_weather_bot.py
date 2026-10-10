@@ -245,6 +245,35 @@ class BotTest(unittest.TestCase):
         self.assertAlmostEqual(settle["pnl"], round(contracts - cost, 2))
         self.assertEqual(ledger.open_positions(), [])
 
+    def test_reads_the_cash_pot_of_the_weather_exchange(self):
+        class PotTransport(FakeTransport):
+            def __call__(self, method, url, headers, params, body):
+                path = url.split("/trade-api/v2", 1)[1]
+                if path == "/portfolio/balance":
+                    return 200, {"balance_dollars": "80.27", "balance_breakdown": [
+                        {"exchange_index": 0, "balance": "0.3000"}, {"exchange_index": 1, "balance": "79.9700"}]}
+                if path.startswith("/series/"):
+                    return 200, {"series": {"category": "Climate and Weather", "exchange_index": 0}}
+                return super().__call__(method, url, headers, params, body)
+
+        transport = PotTransport({"KXHIGHNY": self.nyc})
+        ledger = Ledger(self.dir / "ledger-demo.jsonl")
+        ledger.fund("2026-09", 100.0, NOW)
+        self.run_bot(transport, "demo", ledger)
+        self.assertEqual(transport.orders, [])  # $0.30 in the weather pot can't buy a 72c contract plus fee
+        self.assertTrue(any("usable capital $0.30" in line for line in self.logs))
+
+    def test_total_loss_stop_creates_stop_and_trades_nothing(self):
+        transport = FakeTransport({"KXHIGHNY": self.nyc})
+        ledger = Ledger(self.dir / "ledger-demo.jsonl")
+        ledger.fund("2026-09", 100.0, NOW)
+        ledger.append({"type": "settle", "ts": NOW.isoformat(), "ticker": "OLD", "side": "yes",
+                       "contracts": 10, "payout": 0.0, "pnl": -10.00})
+        self.run_bot(transport, "demo", ledger)
+        self.assertEqual(transport.orders, [])
+        self.assertTrue((self.dir / self.rules.kill_switch_file).exists())
+        self.assertTrue(any("TOTAL LOSS STOP" in line for line in self.logs))
+
 
 if __name__ == "__main__":
     unittest.main()

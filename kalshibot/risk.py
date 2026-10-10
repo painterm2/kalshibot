@@ -49,6 +49,9 @@ class AccountState:
     # of them, because Kalshi nets YES and NO in a market and a bot order
     # there could close or change the owner's position.
     owner_tickers: frozenset[str] = frozenset()
+    # Realized P&L and open worst case of the bot's other strategies, for the total loss stop.
+    other_realized_lifetime: float = 0.0
+    other_open_risk: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -101,6 +104,12 @@ def daily_risk_used(state: AccountState) -> float:
     return realized_loss_today + sum(p.max_loss for p in state.open_positions)
 
 
+def total_pnl_floor(state: AccountState) -> float:
+    """The bot's total P&L across all strategies if every open bet loses."""
+    return (state.realized_pnl_lifetime + state.other_realized_lifetime
+            - sum(p.max_loss for p in state.open_positions) - state.other_open_risk)
+
+
 def size_order(rules: Rules, state: AccountState, price: float, win_probability: float) -> int:
     """Number of contracts to buy: fractional Kelly, then clipped by every cap."""
     if not 0 < price < 1 or win_probability <= price:
@@ -111,6 +120,7 @@ def size_order(rules: Rules, state: AccountState, price: float, win_probability:
         stake,
         rules.max_risk_per_trade,
         rules.daily_loss_limit - daily_risk_used(state),
+        total_pnl_floor(state) + rules.total_loss_stop,
     )
     contracts = math.floor(cap / price)
     while contracts > 0 and order_cost(rules, contracts, price) > cap:
@@ -140,6 +150,11 @@ def check_order(
     if state.orders_today >= rules.max_orders_per_day:
         reasons.append(f"already placed {state.orders_today} orders today")
 
+    if total_pnl_floor(state) - cost < -rules.total_loss_stop - 1e-9:
+        reasons.append(
+            f"would let total P&L reach ${total_pnl_floor(state) - cost:.2f} if everything loses "
+            f"(stop at -${rules.total_loss_stop:.2f})"
+        )
     if -state.realized_pnl_month >= rules.monthly_loss_limit:
         reasons.append("monthly loss limit reached; trading paused until next month")
     if daily_risk_used(state) + cost > rules.daily_loss_limit + 1e-9:

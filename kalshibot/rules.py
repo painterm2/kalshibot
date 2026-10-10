@@ -27,6 +27,8 @@ class Rules:
     live_trading: bool
     kill_switch_file: str
     max_orders_per_day: int
+    # Stop everything once the bot's total realized P&L, across all strategies, reaches -this.
+    total_loss_stop: float
 
     def __post_init__(self) -> None:
         if self.monthly_budget <= 0:
@@ -43,6 +45,8 @@ class Rules:
             raise ValueError("need 0 < min_price < max_price < 1")
         if self.max_hours_to_close <= 0:
             raise ValueError("max_hours_to_close must be positive")
+        if self.total_loss_stop <= 0:
+            raise ValueError("total_loss_stop must be positive")
 
 
 def load_rules(path: Path | str = DEFAULT_RULES_PATH) -> Rules:
@@ -65,4 +69,5 @@ def load_rules(path: Path | str = DEFAULT_RULES_PATH) -> Rules:
         live_trading=raw["safety"]["live_trading"],
         kill_switch_file=raw["safety"]["kill_switch_file"],
         max_orders_per_day=raw["safety"]["max_orders_per_day"],
+        total_loss_stop=raw["safety"]["total_loss_stop"],
     )

@@ -47,3 +47,6 @@ live_trading = true
 # If this file exists, the bot places no new orders.
 kill_switch_file = "STOP"
 max_orders_per_day = 20
+# Hard stop for the whole bot: never let its total P&L (realized, plus the worst
+# case of open bets) go below -$10, and create STOP once realized P&L hits -$10.
+total_loss_stop = 10.00

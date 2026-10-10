@@ -11,6 +11,7 @@ them, and every order has to pass `check_order()` before it is sent.
 |---|---|---|
 | Monthly budget | $100 | The most new money the bot counts per calendar month. If you deposit more, the bot ignores the extra. |
 | Deposits and withdrawals | never | The bot only trades. Moving money in or out is always done by you. Its API key should have trading permission only. |
+| Cash pots | per exchange | Kalshi keeps cash in a separate pot for each exchange, and an order can only spend its market's pot. Weather markets use exchange 0. The bot reads that pot, not the account total, and never moves money between pots. |
 | Your own trades | untouched | The account is shared with your own trading. The bot only sells contracts it bought itself, and it tracks them in its own ledger. It never trades a market where you hold a position, because Kalshi nets YES and NO within a market and a bot order there could close yours. Its budget and loss limits count only its own trades. |
 | Winnings | compound | Profits stay in the bankroll and raise future bet sizes. Long-term growth depends on this. |
 
@@ -52,6 +53,7 @@ raising it to $5-10 lets profitable strategies scale.
 | Live trading | on (since 2026-09-29) | Set `live_trading = false` in `rules.toml` to stop real-money orders. |
 | Kill switch | a file named `STOP` | Create it and the bot places no orders at all, buys or sells. Delete it to resume. |
 | Max orders per day | 20 | Catches runaway loops and bugs. |
+| Total loss stop | -$10 | Your rule: if the bot's total P&L across all strategies ever reaches -$10, everything stops. Orders are refused if every open bet losing would take the total below -$10, and once realized P&L hits -$10 the bot creates `STOP`. Only you can delete it. |
 
 ## Schedule
 

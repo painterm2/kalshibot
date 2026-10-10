@@ -53,6 +53,20 @@ class RiskTest(unittest.TestCase):
     def check(self, state, proposal, live=False):
         return check_order(self.rules, state, proposal, NOW, live=live, kill_switch_dir=self.tmp.name)
 
+    def test_total_loss_stop_counts_open_bets_and_other_strategies(self):
+        # Up $2 here, but another strategy is down $9 with $2 open: the worst case is -$9,
+        # so only $1 of room is left before the -$10 stop.
+        state = fresh_state(realized_pnl_lifetime=2.0, other_realized_lifetime=-9.0, other_open_risk=2.0)
+        decision = self.check(state, order())  # risks $1.67
+        self.assertFalse(decision.allowed)
+        self.assertTrue(any("total P&L" in r for r in decision.reasons), decision.reasons)
+        contracts = size_order(self.rules, state, 0.40, 0.55)
+        self.assertLessEqual(order_cost(self.rules, contracts, 0.40), 1.0)
+
+    def test_total_loss_stop_leaves_room_when_far_away(self):
+        state = fresh_state(realized_pnl_lifetime=5.37)
+        self.assertTrue(self.check(state, order()).allowed)
+
     def test_good_order_is_allowed(self):
         decision = self.check(fresh_state(), order())
         self.assertTrue(decision.allowed, decision.reasons)

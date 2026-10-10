@@ -60,7 +60,27 @@ def account_state(rules: Rules, client: KalshiClient, ledger: Ledger, mode: str,
         cash = sum(paper.contributions.values()) + paper.realized_pnl_lifetime - sum(
             p.max_loss for p in paper.open_positions)
         return ledger.state(max(cash, 0.0), now, rules.timezone, owned)
-    return ledger.state(client.balance(), now, rules.timezone, owned)
+    return ledger.state(client.balance(weather_exchange_index(client)), now, rules.timezone, owned)
+
+
+def weather_exchange_index(client: KalshiClient) -> int | None:
+    """The exchange the weather series trade on, so the bot reads that cash pot. None reads the total."""
+    try:
+        return client.series_exchange_index(weather.STATIONS[0].series)
+    except Exception:
+        return None
+
+
+def enforce_total_loss_stop(rules: Rules, state, mode: str, kill_switch_dir: Path, now: datetime, log) -> None:
+    """Create STOP once the bot's total realized P&L reaches -total_loss_stop. Only you can undo it."""
+    total = state.realized_pnl_lifetime + state.other_realized_lifetime
+    if mode == "dry-run" or total > -rules.total_loss_stop + 1e-9:
+        return
+    stop = Path(kill_switch_dir) / rules.kill_switch_file
+    if not stop.exists():
+        stop.write_text(f"{now.isoformat()}: total realized P&L ${total:+.2f} reached the "
+                        f"-${rules.total_loss_stop:.2f} stop. Delete this file to resume.\n")
+    log(f"TOTAL LOSS STOP: realized P&L ${total:+.2f} is at or below -${rules.total_loss_stop:.2f}; STOP created")
 
 
 def settle(client: KalshiClient, ledger: Ledger, now: datetime, log) -> None:
@@ -177,6 +197,7 @@ def run_once(rules: Rules, client: KalshiClient, mode: str, now: datetime, log=p
     log(f"mode={mode} exchange={client.env}")
     settle(client, ledger, now, log)
     state = account_state(rules, client, ledger, mode, now)
+    enforce_total_loss_stop(rules, state, mode, kill_switch_dir, now, log)
     log(f"usable capital ${usable_capital(rules, state):.2f}, open positions {len(state.open_positions)}, "
         f"orders today {state.orders_today}, realized today ${state.realized_pnl_today:+.2f}")
 
