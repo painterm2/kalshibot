@@ -4,9 +4,12 @@
       "Bash(python3 -m kalshibot run --mode live)",
       "Bash(python3 -m kalshibot status --mode live)",
       "Bash(python3 -m kalshibot report *)",
+      "Bash(python3 -m kalshibot commodities --mode live *)",
       "Bash(python3 -m unittest)",
       "Bash(git pull *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(git add *)",
+      "Bash(git commit *)"
     ]
   }
 }
