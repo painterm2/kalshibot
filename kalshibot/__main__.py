@@ -2,8 +2,9 @@
 
   check-key          Check the API key against Kalshi's demo and live exchanges (read-only).
   run [--mode M]     One pass of the weather strategy. M is dry-run (default), demo or live.
-  commodities [--mode M] [--loop-minutes N] [--every S]
+  commodities [--mode M] [--loop-minutes N] [--every S] [--background]
                      Gold and silver: one pass, or passes every S seconds for N minutes.
+                     --background detaches the loop (log in logs/, at most one loop per mode).
   fund AMOUNT        Record money you gave the bot this month (demo/live ledgers).
   status [--mode M]  The bot's positions and P&L from its ledger.
   report [--days N]  Performance report (Markdown) from the live ledger; --out saves it to a file.
@@ -40,6 +41,68 @@ def check_key() -> int:
     return 0 if ok else 1
 
 
+LOG_DIR = Path(__file__).resolve().parent.parent / "logs"
+
+
+def loop_pid_file(mode: str) -> Path:
+    return LOG_DIR / f"commodities-{mode}.pid"
+
+
+def loop_running(mode: str) -> int | None:
+    """PID of the running commodities loop for this mode, or None."""
+    try:
+        pid = int(loop_pid_file(mode).read_text().strip())
+        os.kill(pid, 0)
+        return pid
+    except (FileNotFoundError, ValueError, ProcessLookupError, PermissionError):
+        return None
+
+
+class loop_lock:
+    """At most one commodities loop per mode: a second one would double every bet."""
+
+    def __init__(self, mode: str):
+        self.mode = mode
+        self.ok = False
+
+    def __enter__(self) -> bool:
+        LOG_DIR.mkdir(exist_ok=True)
+        path = loop_pid_file(self.mode)
+        if path.exists() and not loop_running(self.mode):
+            path.unlink(missing_ok=True)  # left over from a loop that died
+        try:  # O_EXCL: if two loops start at once, only one gets the file
+            fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except FileExistsError:
+            return False
+        with os.fdopen(fd, "w") as f:
+            f.write(str(os.getpid()))
+        self.ok = True
+        return True
+
+    def __exit__(self, *exc) -> None:
+        if self.ok and loop_running(self.mode) == os.getpid():
+            loop_pid_file(self.mode).unlink(missing_ok=True)
+
+
+def start_background_loop(mode: str) -> int:
+    """Re-run this command without --background, detached, logging to logs/commodities-<mode>.log."""
+    import subprocess
+    import sys
+    pid = loop_running(mode)
+    if pid:
+        print(f"a {mode} commodities loop is already running (pid {pid}); not starting another")
+        return 0
+    LOG_DIR.mkdir(exist_ok=True)
+    argv = [a for a in sys.argv[1:] if a != "--background"]
+    log = open(LOG_DIR / f"commodities-{mode}.log", "a")
+    proc = subprocess.Popen([sys.executable, "-m", "kalshibot", *argv], stdout=log, stderr=subprocess.STDOUT,
+                            stdin=subprocess.DEVNULL, start_new_session=True,
+                            cwd=Path(__file__).resolve().parent.parent)
+    print(f"started {mode} commodities loop in the background (pid {proc.pid}); log: logs/commodities-{mode}.log "
+          "(it exits at once if another loop got there first)")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="kalshibot")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -51,6 +114,7 @@ def main(argv: list[str] | None = None) -> int:
     com.add_argument("--mode", choices=bot.MODES, default="dry-run")
     com.add_argument("--loop-minutes", type=float, default=0)
     com.add_argument("--every", type=float, default=60)
+    com.add_argument("--background", action="store_true")
     fund = sub.add_parser("fund")
     fund.add_argument("amount", type=float)
     fund.add_argument("--mode", choices=("demo", "live"), default="live")
@@ -82,8 +146,15 @@ def main(argv: list[str] | None = None) -> int:
         exchange = os.environ.get("KALSHI_ENV") or DEFAULT_EXCHANGE[args.mode]
         client = KalshiClient.from_env(exchange)
         if args.loop_minutes > 0:
-            commodities.run_loop(crules, client, args.mode, args.loop_minutes, args.every,
-                                 log=lambda *a: print(*a, flush=True))
+            if args.background:
+                return start_background_loop(args.mode)
+            with loop_lock(args.mode) as ok:
+                if not ok:
+                    print(f"a {args.mode} commodities loop is already running; not starting another")
+                    return 0
+                commodities.run_loop(crules, client, args.mode, args.loop_minutes, args.every,
+                                     log=lambda *a: print(datetime.now(timezone.utc).strftime("%H:%M:%S"), *a,
+                                                          flush=True))
         else:
             commodities.run_once(crules, client, args.mode, now)
         return 0

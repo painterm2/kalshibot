@@ -153,3 +153,22 @@ class RunTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LoopLockTest(unittest.TestCase):
+    def test_only_one_loop_per_mode(self):
+        from kalshibot import __main__ as cli
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        original = cli.LOG_DIR
+        cli.LOG_DIR = Path(tmp.name)
+        self.addCleanup(setattr, cli, "LOG_DIR", original)
+        with cli.loop_lock("live") as first:
+            self.assertTrue(first)
+            with cli.loop_lock("live") as second:
+                self.assertFalse(second)
+            self.assertTrue(cli.loop_pid_file("live").exists())  # the loser doesn't remove the winner's lock
+        self.assertFalse(cli.loop_pid_file("live").exists())
+        cli.loop_pid_file("live").write_text("999999")  # a loop that died
+        with cli.loop_lock("live") as again:
+            self.assertTrue(again)
