@@ -237,13 +237,14 @@ class KalshiClient:
 
         Kalshi keeps cash in one pot per exchange and an order can only spend its
         market's pot; the Kalshi app moves cash between pots on its own, the API
-        doesn't. `amount` is in dollars and is sent in cents.
+        doesn't. `amount` is in dollars; Kalshi takes it in ten-thousandths of a dollar
+        (sending 177 moved $0.0177 on 2026-10-11).
         """
-        cents = round(amount * 100)
-        if cents <= 0 or source == destination:
+        units = round(amount * 10_000)
+        if units <= 0 or source == destination:
             raise ValueError("transfer needs a positive amount and two different pots")
         # "event_contract" is the regular (non-margin) side of the account, as in Kalshi's transfer history.
-        body = {"amount": cents, "source": "event_contract", "destination": "event_contract",
+        body = {"amount": units, "source": "event_contract", "destination": "event_contract",
                 "source_exchange_shard": source, "destination_exchange_shard": destination}
         return self.request("POST", "/portfolio/intra_exchange_instance_transfer", body=body)
 
