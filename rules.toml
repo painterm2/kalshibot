@@ -50,3 +50,17 @@ max_orders_per_day = 20
 # Hard stop for the whole bot: never let its total P&L (realized, plus the worst
 # case of open bets) go below -$10, and create STOP once realized P&L hits -$10.
 total_loss_stop = 10.00
+
+# Gold and silver price markets (kalshibot/commodities.py). Same rules as above,
+# except these. It has its own ledger and its own daily limit, so weather and
+# commodities can each lose at most their own limit in a day; the total loss stop
+# in [safety] covers both together.
+[commodities]
+daily_loss_limit = 5.00
+# Small bets, many of them: the 15-minute markets turn over all day.
+max_risk_per_trade = 1.00
+max_orders_per_day = 60
+# Daily markets close at 5pm New York time, up to about a day ahead.
+max_hours_to_close = 30
+# Paper trading first. Flip to true only after the owner has seen paper results.
+live_trading = false

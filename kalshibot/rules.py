@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import tomllib
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 DEFAULT_RULES_PATH = Path(__file__).resolve().parent.parent / "rules.toml"
@@ -49,9 +49,26 @@ class Rules:
             raise ValueError("total_loss_stop must be positive")
 
 
-def load_rules(path: Path | str = DEFAULT_RULES_PATH) -> Rules:
+# Settings a strategy section (e.g. [commodities]) may override.
+STRATEGY_OVERRIDES = ("daily_loss_limit", "max_risk_per_trade", "max_orders_per_day", "max_hours_to_close",
+                      "live_trading", "min_edge_per_contract", "kelly_fraction")
+
+
+def load_rules(path: Path | str = DEFAULT_RULES_PATH, strategy: str | None = None) -> Rules:
+    """The rules for weather (the default), or for `strategy` with its section's overrides."""
     with open(path, "rb") as f:
         raw = tomllib.load(f)
+    rules = _base_rules(raw)
+    if strategy:
+        section = raw[strategy]
+        unknown = set(section) - set(STRATEGY_OVERRIDES)
+        if unknown:
+            raise ValueError(f"[{strategy}] can't override {sorted(unknown)}")
+        rules = replace(rules, **section)
+    return rules
+
+
+def _base_rules(raw: dict) -> Rules:
     return Rules(
         monthly_budget=raw["funding"]["monthly_budget"],
         daily_loss_limit=raw["losses"]["daily_loss_limit"],

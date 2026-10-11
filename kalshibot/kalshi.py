@@ -72,6 +72,7 @@ class Market:
     title: str
     # Which exchange (and so which cash pot) the market trades on.
     exchange_index: int | None = None
+    open_time: datetime | None = None
 
     @classmethod
     def from_api(cls, raw: dict) -> "Market":
@@ -97,6 +98,7 @@ class Market:
             result=raw.get("result") or "",
             title=raw.get("title", ""),
             exchange_index=raw.get("exchange_index"),
+            open_time=parse_time(raw["open_time"]) if raw.get("open_time") else None,
         )
 
     def ask(self, side: str) -> float | None:

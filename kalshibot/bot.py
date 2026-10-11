@@ -39,30 +39,56 @@ class Candidate:
     forecast: weather.Forecast
     category: str
 
+    def details(self) -> dict:
+        """Strategy-specific fields recorded with each buy."""
+        return {"forecast_high": self.forecast.high_f, "lead_days": self.forecast.lead_days}
 
-def ledger_for(mode: str, directory: Path = REPO_ROOT) -> Ledger:
-    return Ledger(directory / f"ledger-{mode}.jsonl")
+
+# Each strategy keeps its own ledger per mode: weather in ledger-<mode>.jsonl,
+# commodities in ledger-commodities-<mode>.jsonl.
+STRATEGIES = ("weather", "commodities")
 
 
-def owner_tickers(client: KalshiClient, ledger: Ledger, mode: str) -> frozenset[str]:
+def ledger_for(mode: str, directory: Path = REPO_ROOT, strategy: str = "weather") -> Ledger:
+    prefix = "ledger" if strategy == "weather" else f"ledger-{strategy}"
+    return Ledger(directory / f"{prefix}-{mode}.jsonl")
+
+
+def other_ledgers(strategy: str, mode: str, directory: Path = REPO_ROOT) -> list[Ledger]:
+    """The other strategies' ledgers for this mode, for the total loss stop and position checks."""
+    return [ledger_for(mode, directory, s) for s in STRATEGIES if s != strategy]
+
+
+def owner_tickers(client: KalshiClient, ledger: Ledger, mode: str, others: list[Ledger] = ()) -> frozenset[str]:
     """Markets where the owner has contracts or resting orders of their own."""
-    bot_net = {} if mode == "dry-run" else ledger.net_contracts()
+    bot_net: dict[str, float] = defaultdict(float)
+    if mode != "dry-run":
+        for led in (ledger, *others):
+            for t, n in led.net_contracts().items():
+                bot_net[t] += n
     owned = {t for t, n in client.positions().items() if abs(n - bot_net.get(t, 0)) > 1e-9}
     # The bot's orders are immediate-or-cancel and never rest, so any resting order is the owner's.
     owned |= {o["ticker"] for o in client.resting_orders()}
     return frozenset(owned)
 
 
-def account_state(rules: Rules, client: KalshiClient, ledger: Ledger, mode: str, now: datetime) -> AccountState:
-    owned = owner_tickers(client, ledger, mode)
+def account_state(rules: Rules, client: KalshiClient, ledger: Ledger, mode: str, now: datetime,
+                  others: list[Ledger] = ()) -> AccountState:
+    owned = owner_tickers(client, ledger, mode, others)
     if mode == "dry-run":
         # Paper cash: what the bot was given, plus what it made, minus what's tied up.
         paper = ledger.state(0.0, now, rules.timezone, owned)
         cash = sum(paper.contributions.values()) + paper.realized_pnl_lifetime - sum(
             p.max_loss for p in paper.open_positions)
-        return ledger.state(max(cash, 0.0), now, rules.timezone, owned)
-    # The whole account's cash: the bot moves what an order needs into the market's pot (fund_pot).
-    return ledger.state(client.balance(), now, rules.timezone, owned)
+        state = ledger.state(max(cash, 0.0), now, rules.timezone, owned)
+    else:
+        # The whole account's cash: the bot moves what an order needs into the market's pot (fund_pot).
+        state = ledger.state(client.balance(), now, rules.timezone, owned)
+    for other in others:
+        o = other.state(0.0, now, rules.timezone, frozenset())
+        state.other_realized_lifetime += o.realized_pnl_lifetime
+        state.other_open_risk += sum(p.max_loss for p in o.open_positions)
+    return state
 
 
 def weather_exchange_index(client: KalshiClient) -> int | None:
@@ -182,7 +208,7 @@ def find_candidates(rules: Rules, client: KalshiClient, now: datetime, log,
     return sorted(best.values(), key=lambda c: c.edge, reverse=True)
 
 
-def execute(client: KalshiClient, ledger: Ledger, mode: str, cand: Candidate, contracts: int,
+def execute(client: KalshiClient, ledger: Ledger, mode: str, cand, contracts: int,
             rules: Rules, now: datetime, log=print) -> tuple[int, float]:
     """Place (or paper-trade) the order. Returns contracts filled and total cost."""
     m = cand.market
@@ -190,7 +216,12 @@ def execute(client: KalshiClient, ledger: Ledger, mode: str, cand: Candidate, co
     if mode == "dry-run":
         filled, avg_price, order_id = contracts, cand.price, None
     else:
-        pot = m.exchange_index if m.exchange_index is not None else weather_exchange_index(client)
+        pot = m.exchange_index
+        if pot is None:
+            try:
+                pot = client.series_exchange_index(m.event_ticker.split("-", 1)[0])
+            except Exception:
+                pot = None
         fund_pot(client, pot, order_cost(rules, contracts, cand.price), log)
         order = client.buy(m.ticker, cand.side, contracts, cand.price)
         order_id = order.get("order_id")
@@ -214,7 +245,7 @@ def execute(client: KalshiClient, ledger: Ledger, mode: str, cand: Candidate, co
         "side": cand.side, "contracts": filled, "requested": contracts, "price": round(avg_price, 4),
         "cost": cost, "order_id": order_id, "simulated": mode == "dry-run",
         "win_probability": round(cand.win_probability, 4), "model_probability": round(cand.model_probability, 4),
-        "forecast_high": cand.forecast.high_f, "lead_days": cand.forecast.lead_days,
+        **cand.details(),
     })
     return filled, cost
 
@@ -224,7 +255,8 @@ def run_once(rules: Rules, client: KalshiClient, mode: str, now: datetime, log=p
              kill_switch_dir: Path = REPO_ROOT) -> None:
     if mode not in MODES:
         raise ValueError(f"mode must be one of {MODES}")
-    ledger = ledger or ledger_for(mode)
+    ledger = ledger or ledger_for(mode, kill_switch_dir)
+    others = other_ledgers("weather", mode, kill_switch_dir)
     live = mode == "live"
     if mode == "dry-run" and not ledger.contributions():
         month = now.astimezone(ZoneInfo(rules.timezone)).strftime("%Y-%m")
@@ -233,7 +265,7 @@ def run_once(rules: Rules, client: KalshiClient, mode: str, now: datetime, log=p
 
     log(f"mode={mode} exchange={client.env}")
     settle(client, ledger, now, log)
-    state = account_state(rules, client, ledger, mode, now)
+    state = account_state(rules, client, ledger, mode, now, others)
     enforce_total_loss_stop(rules, state, mode, kill_switch_dir, now, log)
     log(f"usable capital ${usable_capital(rules, state):.2f}, open positions {len(state.open_positions)}, "
         f"orders today {state.orders_today}, realized today ${state.realized_pnl_today:+.2f}")
@@ -260,7 +292,7 @@ def run_once(rules: Rules, client: KalshiClient, mode: str, now: datetime, log=p
         verb = "PAPER" if mode == "dry-run" else "BUY"
         log(f"  {verb:5} {header} -- {filled}/{contracts} filled, cost ${cost:.2f}")
         placed += 1
-        state = account_state(rules, client, ledger, mode, now)
+        state = account_state(rules, client, ledger, mode, now, others)
     if not candidates or candidates[0].edge < rules.min_edge_per_contract:
         log("no market clears the minimum edge right now")
     log(f"done: {placed} order(s) {'simulated' if mode == 'dry-run' else 'placed'}")

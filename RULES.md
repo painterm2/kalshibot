@@ -81,3 +81,21 @@ its realized P&L over those 14 days, after fees. If it is above $0:
 
 If P&L is $0 or below, nothing changes and the run reports the result instead. Any growth
 beyond this one step is your call, not the bot's.
+
+## Commodities (gold and silver)
+
+Added 2026-10-11 at your request. `kalshibot/commodities.py` trades Kalshi's gold and
+silver price markets (15-minute, hourly and daily), checking every minute while metals
+markets are open. Its settings are the `[commodities]` section of `rules.toml`;
+everything not listed there follows the rules above.
+
+| Rule | Value | Why |
+|---|---|---|
+| Daily loss limit | $5 | Your number. Separate from weather's $3, so the worst day for both together is $8. |
+| Max risk per trade | $1.00 | Small bets, many of them, so no single 15-minute coin flip matters much. |
+| Max orders per day | 60 | The 15-minute markets turn over all day. |
+| Total loss stop | -$10 | Shared with weather: the two strategies' P&L is added together. |
+| Live trading | **off** (paper first) | It paper-trades with $100 of paper money until you've seen the results and say go. |
+| Price source | Pyth spot gold and silver | Your Pyth key covers spot gold and silver only. Kalshi settles on Pyth's 24/7 index prices, which the key can't read, so the bot measures the gap from each 15-minute market's starting price. |
+| Hours | metals market hours | Outside them Pyth's spot price stops updating and the bot sits out. |
+| Last minutes | skipped | It doesn't trade a market in its final 3 minutes, when traders watching every tick know more. |
