@@ -277,6 +277,7 @@ class BotTest(unittest.TestCase):
         self.assertEqual(len(transport.transfers), 1)
         t = transport.transfers[0]
         self.assertEqual((t["source_exchange_shard"], t["destination_exchange_shard"]), (3, 0))
+        self.assertEqual((t["source"], t["destination"]), ("event_contract", "event_contract"))
         cost = ledger.open_positions()[0].max_loss
         self.assertLessEqual(t["amount"] / 100, cost)  # never more than the order costs
         self.assertGreaterEqual(pots[0] + 1e-9, 0.0)

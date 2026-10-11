@@ -242,7 +242,9 @@ class KalshiClient:
         cents = round(amount * 100)
         if cents <= 0 or source == destination:
             raise ValueError("transfer needs a positive amount and two different pots")
-        body = {"amount": cents, "source_exchange_shard": source, "destination_exchange_shard": destination}
+        # "event_contract" is the regular (non-margin) side of the account, as in Kalshi's transfer history.
+        body = {"amount": cents, "source": "event_contract", "destination": "event_contract",
+                "source_exchange_shard": source, "destination_exchange_shard": destination}
         return self.request("POST", "/portfolio/intra_exchange_instance_transfer", body=body)
 
 
