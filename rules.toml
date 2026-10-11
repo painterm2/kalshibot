@@ -62,5 +62,5 @@ max_risk_per_trade = 1.00
 max_orders_per_day = 60
 # Daily markets close at 5pm New York time, up to about a day ahead.
 max_hours_to_close = 30
-# Paper trading first. Flip to true only after the owner has seen paper results.
-live_trading = false
+# Real money since 2026-10-11, at the owner's request (no paper results yet).
+live_trading = true

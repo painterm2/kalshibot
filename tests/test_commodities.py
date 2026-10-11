@@ -81,7 +81,6 @@ class RunTest(unittest.TestCase):
 
     def test_rules(self):
         self.assertEqual(self.rules.daily_loss_limit, 5.00)
-        self.assertFalse(self.rules.live_trading)  # paper first
         self.assertEqual(load_rules().daily_loss_limit, 3.00)  # weather unchanged
 
     def test_paper_trades_a_mispriced_market(self):
@@ -119,6 +118,8 @@ class RunTest(unittest.TestCase):
         self.assertFalse(any(e["type"] == "buy" for e in ledger.entries()))
 
     def test_live_blocked_while_commodities_live_trading_off(self):
+        from dataclasses import replace
+        self.rules = replace(self.rules, live_trading=False)
         transport = CommoditiesTransport({"KXGOLD15M": [fifteen_min()]})
         ledger = bot.ledger_for("live", self.dir, "commodities")
         ledger.fund("2026-10", 100.0, NOW)

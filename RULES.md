@@ -95,7 +95,7 @@ everything not listed there follows the rules above.
 | Max risk per trade | $1.00 | Small bets, many of them, so no single 15-minute coin flip matters much. |
 | Max orders per day | 60 | The 15-minute markets turn over all day. |
 | Total loss stop | -$10 | Shared with weather: the two strategies' P&L is added together. |
-| Live trading | **off** (paper first) | It paper-trades with $100 of paper money until you've seen the results and say go. |
+| Live trading | **on** (since 2026-10-11) | You switched it to real money before any paper results. The limits above still hold. Set `live_trading = false` under `[commodities]` in `rules.toml` to go back to paper. |
 | Price source | Pyth spot gold and silver | Your Pyth key covers spot gold and silver only. Kalshi settles on Pyth's 24/7 index prices, which the key can't read, so the bot measures the gap from each 15-minute market's starting price. |
 | Hours | metals market hours | Outside them Pyth's spot price stops updating and the bot sits out. |
 | Last minutes | skipped | It doesn't trade a market in its final 3 minutes, when traders watching every tick know more. |
