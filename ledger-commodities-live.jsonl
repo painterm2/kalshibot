@@ -1,1 +1,2 @@
 {"amount": 100.0, "month": "2026-10", "ts": "2026-10-11T20:33:23.074397+00:00", "type": "fund"}
+{"asset": "Gold", "contracts": 1, "cost": 0.81, "event_ticker": "KXGOLDD-26OCT1217", "index_price": 4192.61, "minutes_left": 1265.9, "model_probability": 0.9289, "order_id": "01a12d63-8010-7686-b12c-1a990ad618ba", "price": 0.8, "requested": 1, "side": "no", "sigma_per_min": 0.0001655, "simulated": false, "ticker": "KXGOLDD-26OCT1217-T4229", "ts": "2026-10-11T23:54:03.945173+00:00", "type": "buy", "win_probability": 0.8594}
