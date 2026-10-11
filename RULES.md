@@ -11,7 +11,7 @@ them, and every order has to pass `check_order()` before it is sent.
 |---|---|---|
 | Monthly budget | $100 | The most new money the bot counts per calendar month. If you deposit more, the bot ignores the extra. |
 | Deposits and withdrawals | never | The bot only trades. Moving money in or out is always done by you. Its API key should have trading permission only. |
-| Cash pots | per exchange | Kalshi keeps cash in a separate pot for each exchange, and an order can only spend its market's pot. Weather markets use exchange 0. The bot reads that pot, not the account total, and never moves money between pots. |
+| Cash pots | moved as needed | Kalshi keeps your cash in one pot per exchange (weather is "Default", commodities "Crypto & Commodities", sports "Tennis, Baseball, Basketball"), and an order can only spend its market's pot. The Kalshi app moves cash between pots for you; the API doesn't. So before each order the bot moves just that order's cost into the market's pot from whichever pot has cash. You approved this on 2026-10-11. It never moves money in or out of the account, every order still passes the daily and total loss limits first, and if a transfer doesn't land exactly, the run stops before ordering. |
 | Your own trades | untouched | The account is shared with your own trading. The bot only sells contracts it bought itself, and it tracks them in its own ledger. It never trades a market where you hold a position, because Kalshi nets YES and NO within a market and a bot order there could close yours. Its budget and loss limits count only its own trades. |
 | Winnings | compound | Profits stay in the bankroll and raise future bet sizes. Long-term growth depends on this. |
 

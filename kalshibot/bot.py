@@ -11,6 +11,7 @@ Modes:
 
 from __future__ import annotations
 
+import math
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
@@ -20,7 +21,7 @@ from zoneinfo import ZoneInfo
 from kalshibot import weather
 from kalshibot.kalshi import KalshiClient, Market, contract_count, price_dollars
 from kalshibot.ledger import Ledger
-from kalshibot.risk import AccountState, OrderProposal, check_order, size_order, trading_fee, usable_capital
+from kalshibot.risk import AccountState, OrderProposal, check_order, order_cost, size_order, trading_fee, usable_capital
 from kalshibot.rules import Rules
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -60,15 +61,49 @@ def account_state(rules: Rules, client: KalshiClient, ledger: Ledger, mode: str,
         cash = sum(paper.contributions.values()) + paper.realized_pnl_lifetime - sum(
             p.max_loss for p in paper.open_positions)
         return ledger.state(max(cash, 0.0), now, rules.timezone, owned)
-    return ledger.state(client.balance(weather_exchange_index(client)), now, rules.timezone, owned)
+    # The whole account's cash: the bot moves what an order needs into the market's pot (fund_pot).
+    return ledger.state(client.balance(), now, rules.timezone, owned)
 
 
 def weather_exchange_index(client: KalshiClient) -> int | None:
-    """The exchange the weather series trade on, so the bot reads that cash pot. None reads the total."""
+    """The exchange the weather series trade on, or None if Kalshi doesn't say."""
     try:
         return client.series_exchange_index(weather.STATIONS[0].series)
     except Exception:
         return None
+
+
+def fund_pot(client: KalshiClient, destination: int | None, needed: float, log) -> None:
+    """Make sure the market's pot holds `needed` dollars, moving only the shortfall from other pots.
+
+    Kalshi keeps cash in one pot per exchange and an order can only spend its market's
+    pot. This moves cash within the owner's account, never in or out of it, and only
+    as much as the order about to be placed costs, which check_order() has already
+    held to the daily and total loss limits. Each transfer is checked afterwards; if a
+    pot didn't change by the amount sent, the run stops.
+    """
+    if destination is None:
+        return
+    pots = client.pot_balances()
+    short = round(needed - pots.get(destination, 0.0), 2)
+    for source, cash in sorted(pots.items(), key=lambda kv: -kv[1]):
+        if short <= 0:
+            return
+        if source == destination:
+            continue
+        amount = round(min(short, math.floor(cash * 100) / 100), 2)
+        if amount <= 0:
+            continue
+        before = client.pot_balances().get(destination, 0.0)
+        client.transfer_between_pots(amount, source, destination)
+        after = client.pot_balances().get(destination, 0.0)
+        log(f"  moved ${amount:.2f} from pot {source} to pot {destination} for the next order")
+        if abs((after - before) - amount) > 0.005:
+            raise RuntimeError(f"moving ${amount:.2f} into pot {destination} changed it by ${after - before:+.2f}; "
+                               "stopping before any order")
+        short = round(short - amount, 2)
+    if short > 0:
+        raise RuntimeError(f"pot {destination} is ${short:.2f} short and no other pot has the cash")
 
 
 def enforce_total_loss_stop(rules: Rules, state, mode: str, kill_switch_dir: Path, now: datetime, log) -> None:
@@ -148,13 +183,15 @@ def find_candidates(rules: Rules, client: KalshiClient, now: datetime, log,
 
 
 def execute(client: KalshiClient, ledger: Ledger, mode: str, cand: Candidate, contracts: int,
-            rules: Rules, now: datetime) -> tuple[int, float]:
+            rules: Rules, now: datetime, log=print) -> tuple[int, float]:
     """Place (or paper-trade) the order. Returns contracts filled and total cost."""
     m = cand.market
     fee = None
     if mode == "dry-run":
         filled, avg_price, order_id = contracts, cand.price, None
     else:
+        pot = m.exchange_index if m.exchange_index is not None else weather_exchange_index(client)
+        fund_pot(client, pot, order_cost(rules, contracts, cand.price), log)
         order = client.buy(m.ticker, cand.side, contracts, cand.price)
         order_id = order.get("order_id")
         filled = round(contract_count(order, "fill_count"))
@@ -219,7 +256,7 @@ def run_once(rules: Rules, client: KalshiClient, mode: str, now: datetime, log=p
             why = "; ".join(decision.reasons) or "Kelly size rounds to 0 contracts"
             log(f"  skip  {header} -- {why}")
             continue
-        filled, cost = execute(client, ledger, mode, cand, contracts, rules, now)
+        filled, cost = execute(client, ledger, mode, cand, contracts, rules, now, log)
         verb = "PAPER" if mode == "dry-run" else "BUY"
         log(f"  {verb:5} {header} -- {filled}/{contracts} filled, cost ${cost:.2f}")
         placed += 1

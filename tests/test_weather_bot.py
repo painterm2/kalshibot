@@ -245,23 +245,57 @@ class BotTest(unittest.TestCase):
         self.assertAlmostEqual(settle["pnl"], round(contracts - cost, 2))
         self.assertEqual(ledger.open_positions(), [])
 
-    def test_reads_the_cash_pot_of_the_weather_exchange(self):
+    def pot_transport(self, pots, honest=True):
         class PotTransport(FakeTransport):
             def __call__(self, method, url, headers, params, body):
                 path = url.split("/trade-api/v2", 1)[1]
                 if path == "/portfolio/balance":
-                    return 200, {"balance_dollars": "80.27", "balance_breakdown": [
-                        {"exchange_index": 0, "balance": "0.3000"}, {"exchange_index": 1, "balance": "79.9700"}]}
+                    return 200, {"balance_dollars": f"{sum(pots.values()):.4f}", "balance_breakdown": [
+                        {"exchange_index": i, "balance": f"{b:.4f}"} for i, b in pots.items()]}
+                if method == "POST" and path == "/portfolio/intra_exchange_instance_transfer":
+                    self.transfers.append(body)
+                    if honest:
+                        pots[body["source_exchange_shard"]] -= body["amount"] / 100
+                        pots[body["destination_exchange_shard"]] += body["amount"] / 100
+                    return 201, {"transfer_id": "t1"}
                 if path.startswith("/series/"):
                     return 200, {"series": {"category": "Climate and Weather", "exchange_index": 0}}
                 return super().__call__(method, url, headers, params, body)
 
         transport = PotTransport({"KXHIGHNY": self.nyc})
+        transport.transfers = []
+        return transport
+
+    def test_moves_only_what_the_order_needs_into_the_weather_pot(self):
+        # Like the real account: weather pot (0) almost empty, cash sitting in the sports pot (3).
+        pots = {0: 0.30, 1: 0.0, 3: 79.97}
+        transport = self.pot_transport(pots)
         ledger = Ledger(self.dir / "ledger-demo.jsonl")
         ledger.fund("2026-09", 100.0, NOW)
         self.run_bot(transport, "demo", ledger)
-        self.assertEqual(transport.orders, [])  # $0.30 in the weather pot can't buy a 72c contract plus fee
-        self.assertTrue(any("usable capital $0.30" in line for line in self.logs))
+        self.assertEqual(len(transport.orders), 1)
+        self.assertEqual(len(transport.transfers), 1)
+        t = transport.transfers[0]
+        self.assertEqual((t["source_exchange_shard"], t["destination_exchange_shard"]), (3, 0))
+        cost = ledger.open_positions()[0].max_loss
+        self.assertLessEqual(t["amount"] / 100, cost)  # never more than the order costs
+        self.assertGreaterEqual(pots[0] + 1e-9, 0.0)
+
+    def test_no_transfer_when_the_pot_already_has_enough(self):
+        transport = self.pot_transport({0: 50.0, 3: 30.0})
+        ledger = Ledger(self.dir / "ledger-demo.jsonl")
+        ledger.fund("2026-09", 100.0, NOW)
+        self.run_bot(transport, "demo", ledger)
+        self.assertEqual(len(transport.orders), 1)
+        self.assertEqual(transport.transfers, [])
+
+    def test_transfer_that_doesnt_land_stops_before_ordering(self):
+        transport = self.pot_transport({0: 0.0, 3: 80.0}, honest=False)
+        ledger = Ledger(self.dir / "ledger-demo.jsonl")
+        ledger.fund("2026-09", 100.0, NOW)
+        with self.assertRaises(RuntimeError):
+            self.run_bot(transport, "demo", ledger)
+        self.assertEqual(transport.orders, [])
 
     def test_total_loss_stop_creates_stop_and_trades_nothing(self):
         transport = FakeTransport({"KXHIGHNY": self.nyc})

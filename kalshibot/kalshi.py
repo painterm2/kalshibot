@@ -70,6 +70,8 @@ class Market:
     no_ask: float | None
     result: str
     title: str
+    # Which exchange (and so which cash pot) the market trades on.
+    exchange_index: int | None = None
 
     @classmethod
     def from_api(cls, raw: dict) -> "Market":
@@ -94,6 +96,7 @@ class Market:
             no_ask=no_ask,
             result=raw.get("result") or "",
             title=raw.get("title", ""),
+            exchange_index=raw.get("exchange_index"),
         )
 
     def ask(self, side: str) -> float | None:
@@ -194,6 +197,14 @@ class KalshiClient:
             return 0.0
         return price_dollars(data, "balance") or 0.0
 
+    def pot_balances(self) -> dict[int, float]:
+        """Cash in each exchange's pot, keyed by exchange index."""
+        data = self.request("GET", "/portfolio/balance")
+        return {pot["exchange_index"]: float(pot.get("balance") or 0) for pot in data.get("balance_breakdown") or []}
+
+    def recent_transfers(self, limit: int = 20) -> list[dict]:
+        return self.request("GET", "/portfolio/intra_exchange_instance_transfers", params={"limit": limit}).get("transfers", [])
+
     def positions(self) -> dict[str, float]:
         """Net contracts per market for the whole account: +YES, -NO."""
         rows = self._paged("/portfolio/positions", "market_positions", {"limit": 200})
@@ -219,7 +230,21 @@ class KalshiClient:
     def fills(self, order_id: str) -> list[dict]:
         return self._paged("/portfolio/fills", "fills", {"order_id": order_id, "limit": 200})
 
-    # The only call that moves money. bot.py gates it behind check_order().
+    # Calls that move money. bot.py gates them behind check_order().
+
+    def transfer_between_pots(self, amount: float, source: int, destination: int) -> dict:
+        """Move cash from one exchange's pot to another, inside the same account.
+
+        Kalshi keeps cash in one pot per exchange and an order can only spend its
+        market's pot; the Kalshi app moves cash between pots on its own, the API
+        doesn't. `amount` is in dollars and is sent in cents.
+        """
+        cents = round(amount * 100)
+        if cents <= 0 or source == destination:
+            raise ValueError("transfer needs a positive amount and two different pots")
+        body = {"amount": cents, "source_exchange_shard": source, "destination_exchange_shard": destination}
+        return self.request("POST", "/portfolio/intra_exchange_instance_transfer", body=body)
+
 
     def buy(self, ticker: str, side: str, contracts: int, price: float, client_order_id: str | None = None) -> dict:
         """Immediate-or-cancel limit buy of YES or NO: fills what it can at `price` or better, never rests.
