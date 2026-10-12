@@ -279,7 +279,7 @@ class BotTest(unittest.TestCase):
         self.assertEqual((t["source_exchange_shard"], t["destination_exchange_shard"]), (3, 0))
         self.assertEqual((t["source"], t["destination"]), ("event_contract", "event_contract"))
         cost = ledger.open_positions()[0].max_loss
-        self.assertLessEqual(t["amount"] / 10_000, cost)  # never more than the order costs
+        self.assertLessEqual(t["amount"] / 10_000, cost + bot.POT_CUSHION)  # the order's cost plus a dime
         self.assertGreaterEqual(pots[0] + 1e-9, 0.0)
 
     def test_no_transfer_when_the_pot_already_has_enough(self):

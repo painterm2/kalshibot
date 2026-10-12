@@ -44,7 +44,15 @@ class CommoditiesTransport(FakeTransport):
         return super().__call__(method, url, headers, params, body)
 
 
+def clear_caches():
+    commodities._vol_cache.clear()
+    commodities._open_spot_cache.clear()
+
+
 class ModelTest(unittest.TestCase):
+    def setUp(self):
+        clear_caches()
+
     def test_at_the_money_is_a_coin_flip(self):
         self.assertAlmostEqual(commodities.prob_above(4000, 4000, 2e-4, 10), 0.5, places=6)
 
@@ -67,6 +75,7 @@ class ModelTest(unittest.TestCase):
 
 class RunTest(unittest.TestCase):
     def setUp(self):
+        clear_caches()
         self.rules = load_rules(strategy="commodities")
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
@@ -153,6 +162,21 @@ class RunTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CacheTest(unittest.TestCase):
+    def test_volatility_is_reused_for_ten_minutes(self):
+        clear_caches()
+        calls = []
+        def fetch(url, params=None):
+            calls.append(url)
+            return {"parsed": [{"price": {"price": "4000000", "expo": -3, "publish_time": int(NOW.timestamp())}}]}
+        commodities.sigma_per_minute(GOLD, NOW, fetch)
+        first = len(calls)
+        commodities.sigma_per_minute(GOLD, NOW + timedelta(minutes=5), fetch)
+        self.assertEqual(len(calls), first)
+        commodities.sigma_per_minute(GOLD, NOW + timedelta(minutes=11), fetch)
+        self.assertGreater(len(calls), first)
 
 
 class LoopLockTest(unittest.TestCase):

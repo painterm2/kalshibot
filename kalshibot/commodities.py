@@ -94,8 +94,25 @@ def spot(asset: Asset, at: datetime | None = None, fetch: Fetch = requests_fetch
                  datetime.fromtimestamp(int(p["publish_time"]), tz=timezone.utc))
 
 
+# Pyth rate-limits each IP (a 429 hit on 2026-10-12 with fresh lookups every minute), so
+# volatility is recomputed at most every VOL_CACHE_MINUTES and the spot price at each
+# 15-minute market's start is looked up once.
+VOL_CACHE_MINUTES = 10
+_vol_cache: dict[str, tuple[datetime, float]] = {}
+_open_spot_cache: dict[tuple[str, datetime], float] = {}
+
+
 def sigma_per_minute(asset: Asset, now: datetime, fetch: Fetch = requests_fetch) -> float:
     """Standard deviation of log price change per minute, from the last hour, with a floor."""
+    cached = _vol_cache.get(asset.name)
+    if cached and timedelta(0) <= now - cached[0] < timedelta(minutes=VOL_CACHE_MINUTES):
+        return cached[1]
+    sigma = _sigma_per_minute(asset, now, fetch)
+    _vol_cache[asset.name] = (now, sigma)
+    return sigma
+
+
+def _sigma_per_minute(asset: Asset, now: datetime, fetch: Fetch) -> float:
     floor = asset.min_annual_vol / math.sqrt(MINUTES_PER_YEAR)
     steps = VOL_LOOKBACK_MINUTES // VOL_STEP_MINUTES
     try:
@@ -162,7 +179,10 @@ def basis(asset: Asset, fifteen_min: list[Market], now: datetime, fetch: Fetch) 
     if not started:
         return None
     m = max(started, key=lambda m: m.open_time)
-    return m.floor_strike - spot(asset, m.open_time, fetch).price
+    key = (asset.name, m.open_time)
+    if key not in _open_spot_cache:
+        _open_spot_cache[key] = spot(asset, m.open_time, fetch).price
+    return m.floor_strike - _open_spot_cache[key]
 
 
 def find_candidates(rules: Rules, client: KalshiClient, now: datetime, log,

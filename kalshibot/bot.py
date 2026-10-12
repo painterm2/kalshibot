@@ -99,6 +99,9 @@ def weather_exchange_index(client: KalshiClient) -> int | None:
         return None
 
 
+POT_CUSHION = 0.10
+
+
 def fund_pot(client: KalshiClient, destination: int | None, needed: float, log) -> None:
     """Make sure the market's pot holds `needed` dollars, moving only the shortfall from other pots.
 
@@ -111,7 +114,10 @@ def fund_pot(client: KalshiClient, destination: int | None, needed: float, log) 
     if destination is None:
         return
     pots = client.pot_balances()
-    short = round(needed - pots.get(destination, 0.0), 2)
+    # Kalshi can hold back a little more than price + fee while an order is open; on
+    # 2026-10-12 a gold order failed with insufficient_balance when its pot held exactly
+    # its cost. A small cushion avoids that; it stays in the pot for the next order.
+    short = round(needed + POT_CUSHION - pots.get(destination, 0.0), 2)
     for source, cash in sorted(pots.items(), key=lambda kv: -kv[1]):
         if short <= 0:
             return
