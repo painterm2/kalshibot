@@ -4,6 +4,7 @@ import unittest
 from dataclasses import replace
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
@@ -150,6 +151,32 @@ class ModelTest(unittest.TestCase):
     def test_climate_day_uses_standard_time(self):
         start = weather.standard_day_start(weather.STATIONS[0], date(2026, 7, 1))
         self.assertEqual(start.utcoffset(), timedelta(hours=-5))
+
+
+class StationsTest(unittest.TestCase):
+    # The CLI (NWS Daily Climate Report) code each series' market rules named on 2026-10-13.
+    CLI_CODES = {
+        "KXHIGHNY": "CLINYC", "KXHIGHCHI": "CLIMDW", "KXHIGHMIA": "CLIMIA", "KXHIGHAUS": "CLIAUS",
+        "KXHIGHDEN": "CLIDEN", "KXHIGHLAX": "CLILAX", "KXHIGHPHIL": "CLIPHL", "KXHIGHTATL": "CLIATL",
+        "KXHIGHTBOS": "CLIBOS", "KXHIGHTDAL": "CLIDFW", "KXHIGHTDC": "CLIDCA", "KXHIGHTEWR": "CLIEWR",
+        "KXHIGHTHOU": "CLIHOU", "KXHIGHTLV": "CLILAS", "KXHIGHTMIN": "CLIMSP", "KXHIGHTNOLA": "CLIMSY",
+        "KXHIGHTOKC": "CLIOKC", "KXHIGHTPHX": "CLIPHX", "KXHIGHTSAN": "CLISAN", "KXHIGHTSATX": "CLISAT",
+        "KXHIGHTSDF": "CLISDF", "KXHIGHTSEA": "CLISEA", "KXHIGHTSFO": "CLISFO", "KXHIGHTTTN": "CLITTN",
+    }
+
+    def test_each_station_matches_its_series_climate_report(self):
+        self.assertEqual({s.series for s in weather.STATIONS}, set(self.CLI_CODES))
+        for s in weather.STATIONS:
+            self.assertEqual("CLI" + s.station_id[1:], self.CLI_CODES[s.series], s.series)
+
+    def test_stations_are_unique_and_valid(self):
+        self.assertEqual(len({s.station_id for s in weather.STATIONS}), len(weather.STATIONS))
+        for s in weather.STATIONS:
+            ZoneInfo(s.tz)
+            self.assertTrue(24 < s.lat < 50 and -125 < s.lon < -66, s.series)
+
+    def test_new_series_tickers_parse(self):
+        self.assertEqual(weather.event_date("KXHIGHTATL-26OCT13"), date(2026, 10, 13))
 
 
 class BotTest(unittest.TestCase):

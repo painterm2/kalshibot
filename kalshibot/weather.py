@@ -42,6 +42,25 @@ STATIONS = (
     Station("KXHIGHDEN", "Denver", "KDEN", 39.8466, -104.6562, "America/Denver"),
     Station("KXHIGHLAX", "Los Angeles (LAX)", "KLAX", 33.9382, -118.3866, "America/Los_Angeles"),
     Station("KXHIGHPHIL", "Philadelphia", "KPHL", 39.8733, -75.2268, "America/New_York"),
+    # Added by the growth step (2026-10-13). Each series' market rules name the station's
+    # NWS Daily Climate Report (CLI code = station id without the K), checked against the Kalshi API.
+    Station("KXHIGHTATL", "Atlanta", "KATL", 33.6403, -84.4269, "America/New_York"),
+    Station("KXHIGHTBOS", "Boston", "KBOS", 42.3606, -71.0106, "America/New_York"),
+    Station("KXHIGHTDAL", "Dallas/Fort Worth", "KDFW", 32.8974, -97.0220, "America/Chicago"),
+    Station("KXHIGHTDC", "Washington DC (Reagan)", "KDCA", 38.8483, -77.0342, "America/New_York"),
+    Station("KXHIGHTEWR", "Newark", "KEWR", 40.6825, -74.1694, "America/New_York"),
+    Station("KXHIGHTHOU", "Houston (Hobby)", "KHOU", 29.6375, -95.2825, "America/Chicago"),
+    Station("KXHIGHTLV", "Las Vegas", "KLAS", 36.0719, -115.1634, "America/Los_Angeles"),
+    Station("KXHIGHTMIN", "Minneapolis", "KMSP", 44.8831, -93.2289, "America/Chicago"),
+    Station("KXHIGHTNOLA", "New Orleans", "KMSY", 29.9928, -90.2508, "America/Chicago"),
+    Station("KXHIGHTOKC", "Oklahoma City", "KOKC", 35.3886, -97.6003, "America/Chicago"),
+    Station("KXHIGHTPHX", "Phoenix", "KPHX", 33.4278, -112.0035, "America/Phoenix"),
+    Station("KXHIGHTSAN", "San Diego", "KSAN", 32.7336, -117.1831, "America/Los_Angeles"),
+    Station("KXHIGHTSATX", "San Antonio", "KSAT", 29.5328, -98.4636, "America/Chicago"),
+    Station("KXHIGHTSDF", "Louisville", "KSDF", 38.1741, -85.7365, "America/Kentucky/Louisville"),
+    Station("KXHIGHTSEA", "Seattle", "KSEA", 47.4447, -122.3136, "America/Los_Angeles"),
+    Station("KXHIGHTSFO", "San Francisco", "KSFO", 37.6196, -122.3656, "America/Los_Angeles"),
+    Station("KXHIGHTTTN", "Trenton", "KTTN", 40.2764, -74.8164, "America/New_York"),
 )
 
 # Standard deviation of (settlement high - NWS forecast high) in degrees F, by

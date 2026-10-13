@@ -19,22 +19,21 @@ them, and every order has to pass `check_order()` before it is sent.
 
 | Rule | Value | Why |
 |---|---|---|
-| Daily loss limit | $3 | A hard limit. Today's realized losses **plus the worst case of every open position** can never go over $3. Even if every open bet loses, the day cannot finish more than $3 down. |
+| Daily loss limit | $5 (was $3 until the 2026-10-13 growth step) | A hard limit. Today's realized losses **plus the worst case of every open position** can never go over $5. Even if every open bet loses, the day cannot finish more than $5 down. |
 | Monthly loss limit | $100 | If the month's realized losses reach $100, the bot stops until the 1st. This protects winnings carried over from earlier months. |
 | Day boundary | midnight, America/New_York | |
 
-**Why $3/day?** It's a cautious start while the bot proves itself. It's 3% of the monthly
-budget, and a full month of losing days (up to about $90) stays under the $100 monthly
-limit. The tradeoff is that the hard daily limit also caps how much can be riding at once
-at $3, so only one or two bets fit at a time. Once you have a few weeks of results,
-raising it to $5-10 lets profitable strategies scale.
+**Why $5/day?** The bot started at $3 while it proved itself, and the growth step raised it
+to $5 after a profitable first 14 days. The hard daily limit also caps how much can be riding
+at once, so two or three bets fit at a time. The monthly $100 limit still applies, and so
+does the -$10 total loss stop.
 
 ## Bet sizing
 
 | Rule | Value | Why |
 |---|---|---|
 | Kelly fraction | 0.25 | Kelly sizing gives the fastest long-term growth *if* the probability estimates are right. Quarter Kelly keeps most of that growth with much smaller swings, and it forgives estimates that are too optimistic. Those are the most likely failure. |
-| Max risk per trade | $2.50 | Caps any single bet. With a $3 daily limit, one full-size bet uses most of the day's budget. |
+| Max risk per trade | $2.50 | Caps any single bet. With a $5 daily limit, two full-size bets fit in a day. |
 | Minimum edge | $0.03/contract after fees | Kalshi fees are large relative to small bets. A bet that only looks good before fees is a losing bet. |
 
 ## Which markets
@@ -67,7 +66,7 @@ claude.ai under Routines, or stop trading with `STOP` / `live_trading = false`.
 
 You can use the account's cash for your own trading whenever you like. The bot counts at
 most $100 a month as its own, and never bets more than the cash actually in the account,
-so if you spend some, it just has less to work with. With the $3 daily limit it rarely
+so if you spend some, it just has less to work with. With the $5 daily limit it rarely
 has more than a few dollars tied up at once.
 
 ## Growth step
@@ -82,6 +81,13 @@ its realized P&L over those 14 days, after fees. If it is above $0:
 If P&L is $0 or below, nothing changes and the run reports the result instead. Any growth
 beyond this one step is your call, not the bot's.
 
+Done 2026-10-13: 14-day P&L was +$5.67 (18 settled bets), so the daily loss limit is now $5
+and 17 more cities were added: Atlanta, Boston, Dallas/Fort Worth, Washington DC, Newark,
+Houston (Hobby), Las Vegas, Minneapolis, New Orleans, Oklahoma City, Phoenix, San Diego,
+San Antonio, Louisville, Seattle, San Francisco and Trenton. Each one's market rules name
+the station's NWS Daily Climate Report (CLI code), the same wording as the original seven
+cities, checked against the Kalshi API that day.
+
 ## Commodities (gold and silver)
 
 Added 2026-10-11 at your request. `kalshibot/commodities.py` trades Kalshi's gold and
@@ -91,7 +97,7 @@ everything not listed there follows the rules above.
 
 | Rule | Value | Why |
 |---|---|---|
-| Daily loss limit | $5 | Your number. Separate from weather's $3, so the worst day for both together is $8. |
+| Daily loss limit | $5 | Your number. Separate from weather's $5, so the worst day for both together is $10. |
 | Max risk per trade | $1.00 | Small bets, many of them, so no single 15-minute coin flip matters much. |
 | Max orders per day | 60 | The 15-minute markets turn over all day. |
 | Total loss stop | -$10 | Shared with weather: the two strategies' P&L is added together. |
