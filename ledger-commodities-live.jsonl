@@ -19,3 +19,4 @@
 {"contracts": 1, "payout": 1.0, "pnl": 0.19, "side": "no", "ticker": "KXGOLDH-26OCT1310-T4179.99", "ts": "2026-10-13T17:49:05.053643+00:00", "type": "settle"}
 {"contracts": 1, "payout": 1.0, "pnl": 0.21, "side": "no", "ticker": "KXSILVER15M-26OCT131000-00", "ts": "2026-10-13T17:49:05.053643+00:00", "type": "settle"}
 {"contracts": 1, "payout": 1.0, "pnl": 0.3, "side": "no", "ticker": "KXGOLD15M-26OCT131000-00", "ts": "2026-10-13T17:49:05.053643+00:00", "type": "settle"}
+{"asset": "Gold", "contracts": 1, "cost": 0.85, "event_ticker": "KXGOLDD-26OCT1417", "index_price": 4153.024, "minutes_left": 1630.9, "model_probability": 0.9425, "order_id": "01a13662-18e8-79ab-913b-30a778f52f69", "price": 0.84, "requested": 1, "side": "no", "sigma_per_min": 0.0001655, "simulated": false, "ticker": "KXGOLDD-26OCT1417-T4197", "ts": "2026-10-13T17:49:05.053643+00:00", "type": "buy", "win_probability": 0.8812}
