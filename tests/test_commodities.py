@@ -90,7 +90,7 @@ class RunTest(unittest.TestCase):
 
     def test_rules(self):
         self.assertEqual(self.rules.daily_loss_limit, 5.00)
-        self.assertEqual(load_rules().daily_loss_limit, 5.00)  # weather's own section
+        self.assertEqual(load_rules().daily_loss_limit, 8.00)  # weather's own section
 
     def test_paper_trades_a_mispriced_market(self):
         # Index started at 4000 (spot 3999, so index runs $1 above spot); spot is now 4001.5,

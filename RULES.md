@@ -19,12 +19,12 @@ them, and every order has to pass `check_order()` before it is sent.
 
 | Rule | Value | Why |
 |---|---|---|
-| Daily loss limit | $5 (was $3 until the 2026-10-13 growth step) | A hard limit. Today's realized losses **plus the worst case of every open position** can never go over $5. Even if every open bet loses, the day cannot finish more than $5 down. |
+| Daily loss limit | $8 (was $3 at launch, $5 after the growth step) | A hard limit. Today's realized losses **plus the worst case of every open position** can never go over $8. Even if every open bet loses, the day cannot finish more than $8 down. |
 | Monthly loss limit | $100 | If the month's realized losses reach $100, the bot stops until the 1st. This protects winnings carried over from earlier months. |
 | Day boundary | midnight, America/New_York | |
 
-**Why $5/day?** The bot started at $3 while it proved itself, and the growth step raised it
-to $5 after a profitable first 14 days. The hard daily limit also caps how much can be riding
+**Why $8/day?** The bot started at $3 while it proved itself, the growth step raised it
+to $5 after a profitable first 14 days, and you raised it to $8 on 2026-10-13. The hard daily limit also caps how much can be riding
 at once, so two or three bets fit at a time. The monthly $100 limit still applies, and so
 does the -$10 total loss stop.
 
@@ -33,7 +33,7 @@ does the -$10 total loss stop.
 | Rule | Value | Why |
 |---|---|---|
 | Kelly fraction | 0.25 | Kelly sizing gives the fastest long-term growth *if* the probability estimates are right. Quarter Kelly keeps most of that growth with much smaller swings, and it forgives estimates that are too optimistic. Those are the most likely failure. |
-| Max risk per trade | $2.50 | Caps any single bet. With a $5 daily limit, two full-size bets fit in a day. |
+| Max risk per trade | $4.00 | Caps any single bet, so the extra daily room can go to bigger bets as well as more cities. Two full-size bets fit in the $8 daily limit. Raised from $2.50 on 2026-10-13 with the $8 limit. |
 | Minimum edge | $0.03/contract after fees | Kalshi fees are large relative to small bets. A bet that only looks good before fees is a losing bet. |
 
 ## Which markets
@@ -66,7 +66,7 @@ claude.ai under Routines, or stop trading with `STOP` / `live_trading = false`.
 
 You can use the account's cash for your own trading whenever you like. The bot counts at
 most $100 a month as its own, and never bets more than the cash actually in the account,
-so if you spend some, it just has less to work with. With the $5 daily limit it rarely
+so if you spend some, it just has less to work with. With the $8 daily limit it rarely
 has more than a few dollars tied up at once.
 
 ## Growth step
@@ -97,7 +97,7 @@ everything not listed there follows the rules above.
 
 | Rule | Value | Why |
 |---|---|---|
-| Daily loss limit | $5 | Your number. Separate from weather's $5, so the worst day for both together is $10. |
+| Daily loss limit | $5 | Your number. Separate from weather's $8, so the worst day for both together is $13, though the -$10 total loss stop still caps everything. |
 | Max risk per trade | $1.00 | Small bets, many of them, so no single 15-minute coin flip matters much. |
 | Max orders per day | 60 | The 15-minute markets turn over all day. |
 | Total loss stop | -$10 | Shared with weather: the two strategies' P&L is added together. |

@@ -46,7 +46,8 @@ def order(**overrides):
 
 class RiskTest(unittest.TestCase):
     def setUp(self):
-        self.rules = load_rules()
+        # Pinned so these tests don't move when the owner changes rules.toml.
+        self.rules = replace(load_rules(), daily_loss_limit=5.00, max_risk_per_trade=2.50)
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
 
