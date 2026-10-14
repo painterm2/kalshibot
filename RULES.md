@@ -57,8 +57,9 @@ does the -$10 total loss stop.
 
 ## Schedule
 
-The "kalshibot live run (3x daily, runner)" routine wakes the "kalshibot runner" session at
-9:47am, 1:47pm and 5:47pm New York time. Each run settles finished bets, places new ones,
+The "kalshibot live run (4x daily, runner)" routine wakes the "kalshibot runner" session at
+9:47am, 1:47pm, 5:47pm and 9:47pm New York time (the 9:47pm run added 2026-10-14). Each run
+also restarts the metals loop if it has stopped. Each run settles finished bets, places new ones,
 checks the account's positions against the bot's ledger (creating `STOP` on any mismatch),
 and commits `ledger-live.jsonl` so the bot's record survives between runs. Pause it in
 claude.ai under Routines, or stop trading with `STOP` / `live_trading = false`.
