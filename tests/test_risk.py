@@ -47,7 +47,8 @@ def order(**overrides):
 class RiskTest(unittest.TestCase):
     def setUp(self):
         # Pinned so these tests don't move when the owner changes rules.toml.
-        self.rules = replace(load_rules(), daily_loss_limit=5.00, max_risk_per_trade=2.50)
+        self.rules = replace(load_rules(), daily_loss_limit=5.00, max_risk_per_trade=2.50,
+                             min_win_probability=0.0)
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
 
@@ -90,6 +91,13 @@ class RiskTest(unittest.TestCase):
         decision = self.check(state, order())  # 4.00 + 1.67 > 5.00
         self.assertFalse(decision.allowed)
         self.assertTrue(any("at risk today" in r for r in decision.reasons))
+
+    def test_min_win_probability(self):
+        self.rules = replace(self.rules, min_win_probability=0.70)
+        decision = self.check(fresh_state(), order())  # 55% to win
+        self.assertFalse(decision.allowed)
+        self.assertTrue(any("win chance" in r for r in decision.reasons))
+        self.assertTrue(self.check(fresh_state(), order(price=0.70, contracts=2, win_probability=0.80)).allowed)
 
     def test_daily_limit_counts_realized_losses(self):
         decision = self.check(fresh_state(realized_pnl_today=-4.0), order())

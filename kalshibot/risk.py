@@ -167,6 +167,8 @@ def check_order(
     if cost > usable_capital(rules, state) + 1e-9:
         reasons.append(f"order costs ${cost:.2f} but only ${usable_capital(rules, state):.2f} is usable")
 
+    if order.win_probability < rules.min_win_probability:
+        reasons.append(f"win chance {order.win_probability:.0%} below {rules.min_win_probability:.0%}")
     if not rules.min_price <= order.price <= rules.max_price:
         reasons.append(f"price {order.price:.2f} outside {rules.min_price:.2f}-{rules.max_price:.2f}")
     hours_left = (order.close_time - now).total_seconds() / 3600
