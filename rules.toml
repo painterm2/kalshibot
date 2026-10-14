@@ -22,7 +22,9 @@ timezone = "America/New_York"
 # less variance and far less damage when the probability estimate is wrong.
 kelly_fraction = 0.25
 # Most any single order may risk (cost + fees).
-max_risk_per_trade = 4.00
+# Owner, 2026-10-14: one bet may use the whole daily limit. Kelly sizing still
+# decides how much of it a bet deserves.
+max_risk_per_trade = 8.00
 # Skip trades whose expected profit after fees is below this, per contract.
 min_edge_per_contract = 0.03
 
@@ -33,8 +35,8 @@ max_hours_to_close = 48
 min_price = 0.05
 max_price = 0.95
 # Only bet when the bot's (market-blended) chance of winning is at least this.
-# Fewer long shots, bigger and safer bets. Set 2026-10-14 at the owner's request.
-min_win_probability = 0.70
+# Fewer long shots, bigger and safer bets. Set 2026-10-14 at the owner's request (70%, then 65%).
+min_win_probability = 0.65
 # At most this many open positions in the same event (correlated outcomes).
 max_positions_per_event = 1
 # Kalshi categories the bot never trades. You trade sports yourself.
@@ -61,8 +63,8 @@ total_loss_stop = 10.00
 # in [safety] covers both together.
 [commodities]
 daily_loss_limit = 5.00
-# Raised from 1.00 on 2026-10-14: fewer, larger, higher-probability bets.
-max_risk_per_trade = 2.50
+# Owner, 2026-10-14: one bet may use the whole daily limit.
+max_risk_per_trade = 5.00
 max_orders_per_day = 60
 # Daily markets close at 5pm New York time, up to about a day ahead.
 max_hours_to_close = 30

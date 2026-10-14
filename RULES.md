@@ -33,7 +33,7 @@ does the -$10 total loss stop.
 | Rule | Value | Why |
 |---|---|---|
 | Kelly fraction | 0.25 | Kelly sizing gives the fastest long-term growth *if* the probability estimates are right. Quarter Kelly keeps most of that growth with much smaller swings, and it forgives estimates that are too optimistic. Those are the most likely failure. |
-| Max risk per trade | $4.00 | Caps any single bet, so the extra daily room can go to bigger bets as well as more cities. Two full-size bets fit in the $8 daily limit. Raised from $2.50 on 2026-10-13 with the $8 limit. |
+| Max risk per trade | $8 (the whole daily limit) | Your call on 2026-10-14: one bet may use the full day's budget. Quarter-Kelly sizing still sets each bet by how big the edge is, so only a strong, likely bet gets close to $8. Was $2.50, then $4. |
 | Minimum edge | $0.03/contract after fees | Kalshi fees are large relative to small bets. A bet that only looks good before fees is a losing bet. |
 
 ## Which markets
@@ -41,7 +41,7 @@ does the -$10 total loss stop.
 | Rule | Value | Why |
 |---|---|---|
 | Time to close | 48 hours or less | Short-term bets only. Money turns over quickly, and results arrive quickly enough to judge the strategy. |
-| Win chance | at least 70% | Your call on 2026-10-14: fewer long shots, larger and more likely bets. The bot only buys a side its estimate (blended with the market price) says wins at least 70% of the time. Bigger price per contract means each bet is larger, and a loss costs more than a win pays, so the edge rule still has to hold. |
+| Win chance | at least 65% | Your call on 2026-10-14: fewer long shots, larger and more likely bets. The bot only buys a side its estimate (blended with the market price) says wins at least 65% of the time. Bigger price per contract means each bet is larger, and a loss costs more than a win pays, so the edge rule still has to hold. |
 | Price range | $0.05 to $0.95 | At extreme prices, fees and cent rounding eat most of the edge. Longshots are also where people misjudge the odds most. |
 | Excluded categories | Sports | You trade sports yourself, so the bot stays out entirely. A market with no category is skipped too, so nothing gets through by accident. |
 | Positions per event | 1 | Markets in the same event usually move together. Two bets there are really one bigger bet. |
@@ -100,7 +100,7 @@ everything not listed there follows the rules above.
 | Rule | Value | Why |
 |---|---|---|
 | Daily loss limit | $5 | Your number. Separate from weather's $8, so the worst day for both together is $13, though the -$10 total loss stop still caps everything. |
-| Max risk per trade | $2.50 | Was $1.00 (many small bets); raised 2026-10-14 for fewer, larger, higher-probability bets. The 70% win chance rule applies here too. |
+| Max risk per trade | $5 (the whole daily limit) | Was $1.00, then $2.50; since 2026-10-14 one bet may use the full day's budget, sized by Kelly. The 65% win chance rule applies here too. |
 | Max orders per day | 60 | The 15-minute markets turn over all day. |
 | Total loss stop | -$10 | Shared with weather: the two strategies' P&L is added together. |
 | Live trading | **on** (since 2026-10-11) | You switched it to real money before any paper results. The limits above still hold. Set `live_trading = false` under `[commodities]` in `rules.toml` to go back to paper. |
