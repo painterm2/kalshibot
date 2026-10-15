@@ -47,3 +47,7 @@
 {"contracts": 4, "cost": 0.26, "event_ticker": "KXHIGHLAX-26OCT14", "forecast_high": 77.0, "lead_days": 1, "model_probability": 0.2576, "order_id": "01a1373d-4e18-7a0b-a69e-055ced2b1daa", "price": 0.06, "requested": 4, "side": "yes", "simulated": false, "ticker": "KXHIGHLAX-26OCT14-B76.5", "ts": "2026-10-13T21:48:01.830809+00:00", "type": "buy", "win_probability": 0.1726}
 {"contracts": 1, "payout": 0.0, "pnl": -0.47, "side": "no", "ticker": "KXHIGHCHI-26OCT13-T82", "ts": "2026-10-14T13:49:09.743117+00:00", "type": "settle"}
 {"contracts": 3, "payout": 0.0, "pnl": -0.35, "side": "yes", "ticker": "KXHIGHLAX-26OCT13-B70.5", "ts": "2026-10-14T17:48:01.974589+00:00", "type": "settle"}
+{"contracts": 7, "payout": 0.0, "pnl": -2.42, "side": "no", "ticker": "KXHIGHTOKC-26OCT14-T82", "ts": "2026-10-15T13:49:52.903696+00:00", "type": "settle"}
+{"contracts": 3, "payout": 0.0, "pnl": -1.58, "side": "no", "ticker": "KXHIGHTDAL-26OCT14-B92.5", "ts": "2026-10-15T13:49:52.903696+00:00", "type": "settle"}
+{"contracts": 1, "payout": 0.0, "pnl": -0.11, "side": "yes", "ticker": "KXHIGHTBOS-26OCT14-T73", "ts": "2026-10-15T13:49:52.903696+00:00", "type": "settle"}
+{"contracts": 1, "payout": 0.0, "pnl": -0.05, "side": "yes", "ticker": "KXHIGHTMIN-26OCT14-B61.5", "ts": "2026-10-15T13:49:52.903696+00:00", "type": "settle"}
