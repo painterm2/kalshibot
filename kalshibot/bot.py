@@ -166,6 +166,12 @@ def settle(client: KalshiClient, ledger: Ledger, now: datetime, log) -> None:
         log(f"settled {pos.ticker} {pos.side.upper()} x{pos.contracts}: {market.result.upper()}, P&L ${pnl:+.2f}")
 
 
+# Weather bets the bot is allowed to make, as (market strike type, side). The owner's call on
+# 2026-10-15: only NO on a temperature range ("between" markets), the one bet type with a
+# winning record (8 of 11 by then). YES long shots and above/below thresholds are left alone.
+WEATHER_BETS = {("between", "no")}
+
+
 def find_candidates(rules: Rules, client: KalshiClient, now: datetime, log,
                     fetch: weather.Fetch = weather.requests_fetch) -> list[Candidate]:
     """Best bet per event across the weather series, highest edge first."""
@@ -203,6 +209,8 @@ def find_candidates(rules: Rules, client: KalshiClient, now: datetime, log,
                 if p_yes is None:
                     continue
                 for side, win_p in (("yes", p_yes), ("no", 1 - p_yes)):
+                    if (m.strike_type, side) not in WEATHER_BETS:
+                        continue
                     price = m.ask(side)
                     if price is None or not 0 < price < 1:
                         continue

@@ -41,6 +41,7 @@ does the -$10 total loss stop.
 | Rule | Value | Why |
 |---|---|---|
 | Time to close | 48 hours or less | Short-term bets only. Money turns over quickly, and results arrive quickly enough to judge the strategy. |
+| Weather bet type | NO on a temperature range only | Your call on 2026-10-15, after 7 straight losses: the bot only bets that the high will *not* land in a 2-degree range (e.g. "not 86-87°"). That was the only weather bet type with a winning record (8 of 11, +$4.58). YES long shots and above/below thresholds are off. Set in `WEATHER_BETS` in `kalshibot/bot.py`. |
 | Win chance | at least 65% | Your call on 2026-10-14: fewer long shots, larger and more likely bets. The bot only buys a side its estimate (blended with the market price) says wins at least 65% of the time. Bigger price per contract means each bet is larger, and a loss costs more than a win pays, so the edge rule still has to hold. |
 | Price range | $0.05 to $0.95 | At extreme prices, fees and cent rounding eat most of the edge. Longshots are also where people misjudge the odds most. |
 | Excluded categories | Sports | You trade sports yourself, so the bot stays out entirely. A market with no category is skipped too, so nothing gets through by accident. |

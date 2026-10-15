@@ -1,6 +1,7 @@
 import base64
 import tempfile
 import unittest
+from unittest import mock
 from dataclasses import replace
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -192,6 +193,11 @@ class BotTest(unittest.TestCase):
             market("KXHIGHNY-26SEP30-B84.5", "between", 84, 85, yes_bid=20, yes_ask=22),
         ]
         self.fetch = fake_nws({"2026-09-29": 80, "2026-09-30": 85})
+        # Most tests here check order mechanics with a YES threshold bet, so let every bet type through.
+        allow_all = {(t, s) for t in ("greater", "less", "between") for s in ("yes", "no")}
+        patcher = mock.patch.object(bot, "WEATHER_BETS", allow_all)
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
     def run_bot(self, transport, mode="dry-run", ledger=None):
         ledger = ledger or Ledger(self.dir / f"ledger-{mode}.jsonl")
@@ -208,6 +214,14 @@ class BotTest(unittest.TestCase):
         self.assertEqual((buys[0]["ticker"], buys[0]["side"]), ("KXHIGHNY-26SEP30-T80", "yes"))
         self.assertLessEqual(buys[0]["cost"], self.rules.max_risk_per_trade)
         self.assertTrue(buys[0]["simulated"])
+
+    def test_only_bets_no_on_temperature_ranges(self):
+        bot.WEATHER_BETS = {("between", "no")}  # the real setting; setUp's patch restores it after
+        # 86-87F is less likely than the market thinks with an 85F forecast, so NO is the bet.
+        markets = self.nyc + [market("KXHIGHNY-26SEP30-B86.5", "between", 86, 87, yes_bid=44, yes_ask=46)]
+        ledger = self.run_bot(FakeTransport({"KXHIGHNY": markets}))
+        buys = [e for e in ledger.entries() if e["type"] == "buy"]
+        self.assertEqual([(b["ticker"], b["side"]) for b in buys], [("KXHIGHNY-26SEP30-B86.5", "no")])
 
     def test_dry_run_respects_limits_across_runs(self):
         transport = FakeTransport({"KXHIGHNY": self.nyc})
