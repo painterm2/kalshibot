@@ -239,13 +239,14 @@ def execute(client: KalshiClient, ledger: Ledger, mode: str, cand, contracts: in
         fund_pot(client, pot, order_cost(rules, contracts, cand.price), log)
         order = client.buy(m.ticker, cand.side, contracts, cand.price)
         order_id = order.get("order_id")
-        filled = round(contract_count(order, "fill_count"))
+        # Kalshi can fill a fraction of a contract (e.g. 0.17), so keep fills to the hundredth.
+        filled = round(contract_count(order, "fill_count"), 2)
         # Fills give the exact price and fee. If they can't be read or haven't caught up,
         # book the fill at the limit price, which can only overstate what was paid.
         avg_price, fee = cand.price, None
         try:
             fills = client.fills(order_id) if filled and order_id else []
-            if fills and round(sum(contract_count(f, "count") for f in fills)) == filled:
+            if fills and abs(sum(contract_count(f, "count") for f in fills) - filled) < 0.005:
                 avg_price = sum(contract_count(f, "count") * price_dollars(f, f"{cand.side}_price")
                                 for f in fills) / filled
                 fee = sum(float(f.get("fee_cost") or 0) for f in fills)

@@ -35,8 +35,9 @@ def market(ticker, strike_type, floor=None, cap=None, yes_bid=40, yes_ask=42, ev
 class FakeTransport:
     """Stands in for Kalshi's HTTP API."""
 
-    def __init__(self, markets_by_series, positions=(), resting=(), settled=None):
+    def __init__(self, markets_by_series, positions=(), resting=(), settled=None, fill=None):
         self.markets_by_series = markets_by_series
+        self.fill = fill  # contracts each order fills; default: all of it
         self.positions = list(positions)
         self.resting = list(resting)
         self.settled = settled or {}
@@ -49,12 +50,14 @@ class FakeTransport:
         path = url.split("/trade-api/v2", 1)[1]
         if method == "POST" and path == "/portfolio/events/orders":
             self.orders.append(body)
-            return 201, {"order_id": f"o{len(self.orders)}", "fill_count": f"{float(body['count']):.2f}",
+            filled = self.fill if self.fill is not None else float(body["count"])
+            return 201, {"order_id": f"o{len(self.orders)}", "fill_count": f"{filled:.2f}",
                          "remaining_count": "0.00", "ts_ms": 0}
         if path == "/portfolio/fills":
             body = self.orders[int(params["order_id"][1:]) - 1]
             yes = float(body["price"])
-            return 200, {"fills": [{"count_fp": f"{float(body['count']):.2f}", "yes_price_dollars": f"{yes:.4f}",
+            filled = self.fill if self.fill is not None else float(body["count"])
+            return 200, {"fills": [{"count_fp": f"{filled:.2f}", "yes_price_dollars": f"{yes:.4f}",
                                     "no_price_dollars": f"{1 - yes:.4f}", "fee_cost": "0.0200"}]}
         if path == "/portfolio/balance":
             return 200, {"balance": 12345}
@@ -251,6 +254,15 @@ class BotTest(unittest.TestCase):
         position = ledger.open_positions()[0]
         self.assertEqual(position.contracts, int(order["count"]))
         self.assertAlmostEqual(position.max_loss, round(position.contracts * 0.72 + 0.02, 2))
+
+    def test_fractional_fill_is_booked(self):
+        # Kalshi filled 0.17 of a contract once; the bot used to round that to 0 and lose track of it.
+        transport = FakeTransport({"KXHIGHNY": self.nyc}, fill=0.17)
+        ledger = Ledger(self.dir / "ledger-demo.jsonl")
+        ledger.fund("2026-09", 100.0, NOW)
+        self.run_bot(transport, "demo", ledger)
+        self.assertEqual(ledger.net_contracts(), {"KXHIGHNY-26SEP30-T80": 0.17})
+        self.assertAlmostEqual(ledger.open_positions()[0].max_loss, round(0.17 * 0.72 + 0.02, 2))
 
     def test_buying_no_is_an_ask_on_the_yes_book(self):
         transport = FakeTransport({})
