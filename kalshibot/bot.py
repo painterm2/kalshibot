@@ -268,9 +268,11 @@ def execute(client: KalshiClient, ledger: Ledger, mode: str, cand, contracts: in
 
 def cash_out(rules: Rules, client: KalshiClient, ledger: Ledger, state: AccountState, mode: str,
              now: datetime, log, kill_switch_dir: Path = REPO_ROOT) -> int:
-    """Sell bets early when they can be sold for at least rules.cash_out_price and the sale
-    locks in a profit after fees: the little upside left isn't worth the money still at risk.
-    Only whole contracts the bot holds are sold. Returns how many sells filled."""
+    """Sell a bet early only when it has gained a lot but the win is still far from sure: it sells
+    for at least rules.cash_out_multiple times what it cost (after fees) AND the market (the
+    midpoint of its bid and ask) gives it less than rules.cash_out_below_chance to win. Bets
+    that are likely winners are held to settlement. Only whole contracts the bot holds are
+    sold. Returns how many sells filled."""
     sold = 0
     for pos in ledger.open_positions():
         whole = int(pos.contracts + 1e-9)
@@ -281,12 +283,14 @@ def cash_out(rules: Rules, client: KalshiClient, ledger: Ledger, state: AccountS
         except Exception as e:
             log(f"couldn't check {pos.ticker} for a cash-out ({e})")
             continue
-        price = market.bid(pos.side)
-        if market.result or price is None or price < rules.cash_out_price:
+        price, ask = market.bid(pos.side), market.ask(pos.side)
+        if market.result or price is None or ask is None:
             continue
+        chance = (price + ask) / 2
         cost_share = pos.max_loss * whole / pos.contracts
-        if whole * price - trading_fee(rules, whole, price) <= cost_share:
-            continue  # cashing out here wouldn't lock in a profit
+        proceeds = whole * price - trading_fee(rules, whole, price)
+        if proceeds < rules.cash_out_multiple * cost_share or chance >= rules.cash_out_below_chance:
+            continue
         decision = check_sell(rules, state, pos.ticker, pos.side, whole, live=mode == "live",
                               kill_switch_dir=kill_switch_dir)
         if not decision.allowed:

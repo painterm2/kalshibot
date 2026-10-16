@@ -269,25 +269,27 @@ class BotTest(unittest.TestCase):
         sold = bot.cash_out(self.rules, client, ledger, state, "live", NOW, self.logs.append, self.dir)
         return transport, ledger, sold
 
-    def test_cashes_out_a_winning_bet_near_a_dollar(self):
-        transport, ledger, sold = self.cash_out_setup(yes_bid=1, yes_ask=2)  # NO sells for 98c
+    def test_cashes_out_when_doubled_but_not_yet_likely(self):
+        # Bought NO at 30c; it now sells for 68c (more than double) and the market gives it 69%.
+        transport, ledger, sold = self.cash_out_setup(yes_bid=30, yes_ask=32, cost_each=0.30)
         self.assertEqual(sold, 1)
-        self.assertEqual((transport.orders[0]["side"], transport.orders[0]["price"]), ("bid", "0.0200"))
+        self.assertEqual((transport.orders[0]["side"], transport.orders[0]["price"]), ("bid", "0.3200"))
         self.assertEqual(ledger.net_contracts(), {})
         sell = [e for e in ledger.entries() if e["type"] == "sell"][0]
-        self.assertAlmostEqual(sell["pnl"], round(3 * 0.98 - 0.02 - 2.25, 2))
+        self.assertAlmostEqual(sell["pnl"], round(3 * 0.68 - 0.02 - 0.90, 2))
         self.assertAlmostEqual(ledger.state(0, NOW, "America/New_York", frozenset()).realized_pnl_lifetime, sell["pnl"])
 
-    def test_holds_when_the_sell_price_is_below_the_cash_out_price(self):
-        transport, ledger, sold = self.cash_out_setup(yes_bid=3, yes_ask=4)  # NO sells for 96c
+    def test_holds_a_likely_winner(self):
+        # Tripled, but the market gives it 91%: hold for the full dollar.
+        transport, ledger, sold = self.cash_out_setup(yes_bid=8, yes_ask=10, cost_each=0.30)
         self.assertEqual((sold, transport.orders), (0, []))
 
-    def test_never_cashes_out_at_a_loss(self):
-        transport, ledger, sold = self.cash_out_setup(yes_bid=1, yes_ask=2, cost_each=0.99, contracts=1)
+    def test_holds_until_doubled(self):
+        transport, ledger, sold = self.cash_out_setup(yes_bid=30, yes_ask=32, cost_each=0.50)
         self.assertEqual((sold, transport.orders), (0, []))
 
     def test_kill_switch_blocks_cash_outs(self):
-        transport, ledger, sold = self.cash_out_setup(yes_bid=1, yes_ask=2, stop=True)
+        transport, ledger, sold = self.cash_out_setup(yes_bid=30, yes_ask=32, cost_each=0.30, stop=True)
         self.assertEqual((sold, transport.orders), (0, []))
 
     def test_partial_cash_out_leaves_the_rest_open(self):
