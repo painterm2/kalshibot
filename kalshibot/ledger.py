@@ -58,6 +58,15 @@ class Ledger:
                 pos = held.setdefault(key, {"event": e["event_ticker"], "contracts": 0, "cost": 0.0})
                 pos["contracts"] += e["contracts"]
                 pos["cost"] += e["cost"]
+            elif e["type"] == "sell" and key in held:
+                # A cash-out closes part or all of a position; the cost left is the unsold share's.
+                pos = held[key]
+                left = pos["contracts"] - e["contracts"]
+                if left <= 0.005:
+                    held.pop(key)
+                else:
+                    pos["cost"] *= left / pos["contracts"]
+                    pos["contracts"] = round(left, 2)
             elif e["type"] == "settle":
                 held.pop(key, None)
         return [
@@ -72,11 +81,11 @@ class Ledger:
         for e in self.entries():
             ts = datetime.fromisoformat(e["ts"]).astimezone(ZoneInfo(tz))
             same_month = (ts.year, ts.month) == (local.year, local.month)
-            if e["type"] == "settle":
+            if e["type"] in ("settle", "sell"):
                 pnl_life += e["pnl"]
                 pnl_month += e["pnl"] if same_month else 0
                 pnl_today += e["pnl"] if ts.date() == local.date() else 0
-            elif e["type"] == "buy" and ts.date() == local.date():
+            if e["type"] in ("buy", "sell") and ts.date() == local.date():
                 orders_today += 1
         return AccountState(
             cash_balance=cash_balance,

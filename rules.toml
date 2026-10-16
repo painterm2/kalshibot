@@ -37,6 +37,9 @@ max_price = 0.95
 # Only bet when the bot's (market-blended) chance of winning is at least this.
 # Fewer long shots, bigger and safer bets. Set 2026-10-14 at the owner's request (70%, then 65%).
 min_win_probability = 0.65
+# Cash out a bet early when it can be sold for at least this (per contract) and
+# the sale locks in a profit after fees. 1.0 turns it off. Owner, 2026-10-16.
+cash_out_price = 0.97
 # At most this many open positions in the same event (correlated outcomes).
 max_positions_per_event = 1
 # Kalshi categories the bot never trades. You trade sports yourself.

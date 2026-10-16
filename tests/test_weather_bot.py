@@ -255,6 +255,50 @@ class BotTest(unittest.TestCase):
         self.assertEqual(position.contracts, int(order["count"]))
         self.assertAlmostEqual(position.max_loss, round(position.contracts * 0.72 + 0.02, 2))
 
+    def cash_out_setup(self, yes_bid, yes_ask, cost_each=0.75, contracts=3, stop=False):
+        m = market("KXHIGHNY-26SEP30-B84.5", "between", 84, 85, yes_bid=yes_bid, yes_ask=yes_ask)
+        transport = FakeTransport({"KXHIGHNY": [m]})
+        ledger = Ledger(self.dir / "ledger-live.jsonl")
+        ledger.fund("2026-09", 100.0, NOW)
+        ledger.append({"type": "buy", "ts": NOW.isoformat(), "ticker": m["ticker"], "event_ticker": m["event_ticker"],
+                       "side": "no", "contracts": contracts, "cost": round(contracts * cost_each, 2)})
+        if stop:
+            (self.dir / "STOP").write_text("")
+        client = KalshiClient("prod", "key-id", PEM, transport)
+        state = bot.account_state(self.rules, client, ledger, "live", NOW)
+        sold = bot.cash_out(self.rules, client, ledger, state, "live", NOW, self.logs.append, self.dir)
+        return transport, ledger, sold
+
+    def test_cashes_out_a_winning_bet_near_a_dollar(self):
+        transport, ledger, sold = self.cash_out_setup(yes_bid=1, yes_ask=2)  # NO sells for 98c
+        self.assertEqual(sold, 1)
+        self.assertEqual((transport.orders[0]["side"], transport.orders[0]["price"]), ("bid", "0.0200"))
+        self.assertEqual(ledger.net_contracts(), {})
+        sell = [e for e in ledger.entries() if e["type"] == "sell"][0]
+        self.assertAlmostEqual(sell["pnl"], round(3 * 0.98 - 0.02 - 2.25, 2))
+        self.assertAlmostEqual(ledger.state(0, NOW, "America/New_York", frozenset()).realized_pnl_lifetime, sell["pnl"])
+
+    def test_holds_when_the_sell_price_is_below_the_cash_out_price(self):
+        transport, ledger, sold = self.cash_out_setup(yes_bid=3, yes_ask=4)  # NO sells for 96c
+        self.assertEqual((sold, transport.orders), (0, []))
+
+    def test_never_cashes_out_at_a_loss(self):
+        transport, ledger, sold = self.cash_out_setup(yes_bid=1, yes_ask=2, cost_each=0.99, contracts=1)
+        self.assertEqual((sold, transport.orders), (0, []))
+
+    def test_kill_switch_blocks_cash_outs(self):
+        transport, ledger, sold = self.cash_out_setup(yes_bid=1, yes_ask=2, stop=True)
+        self.assertEqual((sold, transport.orders), (0, []))
+
+    def test_partial_cash_out_leaves_the_rest_open(self):
+        ledger = Ledger(self.dir / "ledger-x.jsonl")
+        ledger.append({"type": "buy", "ts": NOW.isoformat(), "ticker": "T", "event_ticker": "E",
+                       "side": "no", "contracts": 4, "cost": 3.00})
+        ledger.append({"type": "sell", "ts": NOW.isoformat(), "ticker": "T", "side": "no",
+                       "contracts": 1, "proceeds": 0.97, "pnl": 0.22})
+        pos = ledger.open_positions()[0]
+        self.assertEqual((pos.contracts, pos.max_loss), (3, 2.25))
+
     def test_fractional_fill_is_booked(self):
         # Kalshi filled 0.17 of a contract once; the bot used to round that to 0 and lose track of it.
         transport = FakeTransport({"KXHIGHNY": self.nyc}, fill=0.17)

@@ -21,7 +21,8 @@ from zoneinfo import ZoneInfo
 from kalshibot import weather
 from kalshibot.kalshi import KalshiClient, Market, contract_count, price_dollars
 from kalshibot.ledger import Ledger
-from kalshibot.risk import AccountState, OrderProposal, check_order, order_cost, size_order, trading_fee, usable_capital
+from kalshibot.risk import (AccountState, OrderProposal, check_order, check_sell, order_cost, size_order,
+                            trading_fee, usable_capital)
 from kalshibot.rules import Rules
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -265,6 +266,63 @@ def execute(client: KalshiClient, ledger: Ledger, mode: str, cand, contracts: in
     return filled, cost
 
 
+def cash_out(rules: Rules, client: KalshiClient, ledger: Ledger, state: AccountState, mode: str,
+             now: datetime, log, kill_switch_dir: Path = REPO_ROOT) -> int:
+    """Sell bets early when they can be sold for at least rules.cash_out_price and the sale
+    locks in a profit after fees: the little upside left isn't worth the money still at risk.
+    Only whole contracts the bot holds are sold. Returns how many sells filled."""
+    sold = 0
+    for pos in ledger.open_positions():
+        whole = int(pos.contracts + 1e-9)
+        if whole <= 0:
+            continue
+        try:
+            market = client.market(pos.ticker)
+        except Exception as e:
+            log(f"couldn't check {pos.ticker} for a cash-out ({e})")
+            continue
+        price = market.bid(pos.side)
+        if market.result or price is None or price < rules.cash_out_price:
+            continue
+        cost_share = pos.max_loss * whole / pos.contracts
+        if whole * price - trading_fee(rules, whole, price) <= cost_share:
+            continue  # cashing out here wouldn't lock in a profit
+        decision = check_sell(rules, state, pos.ticker, pos.side, whole, live=mode == "live",
+                              kill_switch_dir=kill_switch_dir)
+        if not decision.allowed:
+            log(f"  skip  cash out {pos.ticker} {pos.side.upper()} @ ${price:.2f} -- {'; '.join(decision.reasons)}")
+            continue
+        fee, order_id = None, None
+        if mode == "dry-run":
+            filled, avg_price = whole, price
+        else:
+            order = client.sell(pos.ticker, pos.side, whole, price)
+            order_id = order.get("order_id")
+            filled = round(contract_count(order, "fill_count"), 2)
+            avg_price = price
+            try:
+                fills = client.fills(order_id) if filled and order_id else []
+                if fills and abs(sum(contract_count(f, "count") for f in fills) - filled) < 0.005:
+                    avg_price = sum(contract_count(f, "count") * price_dollars(f, f"{pos.side}_price")
+                                    for f in fills) / filled
+                    fee = sum(float(f.get("fee_cost") or 0) for f in fills)
+            except Exception:
+                pass
+        if not filled:
+            log(f"  CASH OUT {pos.ticker} {pos.side.upper()} @ ${price:.2f} -- 0/{whole} filled")
+            continue
+        if fee is None:
+            fee = trading_fee(rules, filled, avg_price)
+        proceeds = round(filled * avg_price - fee, 2)
+        pnl = round(proceeds - pos.max_loss * filled / pos.contracts, 2)
+        ledger.append({"type": "sell", "ts": now.isoformat(), "ticker": pos.ticker, "side": pos.side,
+                       "contracts": filled, "price": round(avg_price, 4), "proceeds": proceeds, "pnl": pnl,
+                       "order_id": order_id, "simulated": mode == "dry-run"})
+        log(f"  CASH OUT {pos.ticker} {pos.side.upper()} x{filled} @ ${avg_price:.2f}: P&L ${pnl:+.2f}")
+        sold += 1
+    return sold
+
+
 def run_once(rules: Rules, client: KalshiClient, mode: str, now: datetime, log=print,
              ledger: Ledger | None = None, fetch: weather.Fetch = weather.requests_fetch,
              kill_switch_dir: Path = REPO_ROOT) -> None:
@@ -282,6 +340,8 @@ def run_once(rules: Rules, client: KalshiClient, mode: str, now: datetime, log=p
     settle(client, ledger, now, log)
     state = account_state(rules, client, ledger, mode, now, others)
     enforce_total_loss_stop(rules, state, mode, kill_switch_dir, now, log)
+    if cash_out(rules, client, ledger, state, mode, now, log, kill_switch_dir):
+        state = account_state(rules, client, ledger, mode, now, others)
     log(f"usable capital ${usable_capital(rules, state):.2f}, open positions {len(state.open_positions)}, "
         f"orders today {state.orders_today}, realized today ${state.realized_pnl_today:+.2f}")
 

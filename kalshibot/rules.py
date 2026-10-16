@@ -23,6 +23,8 @@ class Rules:
     max_price: float
     # Only bet a side the bot thinks wins at least this often (the owner's "more guaranteed bets").
     min_win_probability: float
+    # Cash out (sell) a bet early once its sell price reaches this and selling locks in a profit.
+    cash_out_price: float
     max_positions_per_event: int
     excluded_categories: tuple[str, ...]
     taker_fee_rate: float
@@ -45,6 +47,8 @@ class Rules:
             raise ValueError("kelly_fraction must be in (0, 1]")
         if not 0 < self.min_price < self.max_price < 1:
             raise ValueError("need 0 < min_price < max_price < 1")
+        if not 0 < self.cash_out_price <= 1:
+            raise ValueError("cash_out_price must be in (0, 1]; 1 turns cashing out off")
         if not 0 <= self.min_win_probability < 1:
             raise ValueError("min_win_probability must be in [0, 1)")
         if self.max_hours_to_close <= 0:
@@ -55,7 +59,7 @@ class Rules:
 
 # Settings a strategy section (e.g. [commodities]) may override.
 STRATEGY_OVERRIDES = ("daily_loss_limit", "max_risk_per_trade", "max_orders_per_day", "max_hours_to_close",
-                      "live_trading", "min_edge_per_contract", "kelly_fraction", "min_win_probability")
+                      "live_trading", "min_edge_per_contract", "kelly_fraction", "min_win_probability", "cash_out_price")
 
 
 def load_rules(path: Path | str = DEFAULT_RULES_PATH, strategy: str | None = None) -> Rules:
@@ -85,6 +89,7 @@ def _base_rules(raw: dict) -> Rules:
         min_price=raw["markets"]["min_price"],
         max_price=raw["markets"]["max_price"],
         min_win_probability=raw["markets"].get("min_win_probability", 0.0),
+        cash_out_price=raw["markets"].get("cash_out_price", 1.0),
         max_positions_per_event=raw["markets"]["max_positions_per_event"],
         excluded_categories=tuple(raw["markets"]["excluded_categories"]),
         taker_fee_rate=raw["fees"]["taker_fee_rate"],

@@ -104,6 +104,9 @@ class Market:
     def ask(self, side: str) -> float | None:
         return self.yes_ask if side == "yes" else self.no_ask
 
+    def bid(self, side: str) -> float | None:
+        return self.yes_bid if side == "yes" else self.no_bid
+
 
 def load_private_key(pem: str):
     return serialization.load_pem_private_key(pem.encode(), password=None)
@@ -265,6 +268,26 @@ class KalshiClient:
         body = {
             "ticker": ticker,
             "side": "bid" if side == "yes" else "ask",
+            "count": str(contracts),
+            "price": f"{yes_price:.4f}",
+            "time_in_force": "immediate_or_cancel",
+            "self_trade_prevention_type": "taker_at_cross",
+            "client_order_id": client_order_id or str(uuid.uuid4()),
+        }
+        return self.request("POST", "/portfolio/events/orders", body=body)
+
+    def sell(self, ticker: str, side: str, contracts: int, price: float, client_order_id: str | None = None) -> dict:
+        """Immediate-or-cancel limit sell of YES or NO the bot holds: fills at `price` or better, never rests.
+
+        On the YES book, selling YES at p is an ask at p, and selling NO at q is a bid at 1 - q.
+        Kalshi nets YES against NO in a market, so this closes the bot's position.
+        """
+        if side not in ("yes", "no"):
+            raise ValueError("side must be yes or no")
+        yes_price = price if side == "yes" else 1 - price
+        body = {
+            "ticker": ticker,
+            "side": "ask" if side == "yes" else "bid",
             "count": str(contracts),
             "price": f"{yes_price:.4f}",
             "time_in_force": "immediate_or_cancel",

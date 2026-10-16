@@ -263,6 +263,8 @@ def run_once(rules: Rules, client: KalshiClient, mode: str, now: datetime, log=p
     bot.settle(client, ledger, now, log)
     state = bot.account_state(rules, client, ledger, mode, now, others)
     bot.enforce_total_loss_stop(rules, state, mode, kill_switch_dir, now, log)
+    if bot.cash_out(rules, client, ledger, state, mode, now, log, kill_switch_dir):
+        state = bot.account_state(rules, client, ledger, mode, now, others)
     log(f"[commodities {mode}] usable ${usable_capital(rules, state):.2f}, open {len(state.open_positions)}, "
         f"orders today {state.orders_today}, realized today ${state.realized_pnl_today:+.2f}")
 
