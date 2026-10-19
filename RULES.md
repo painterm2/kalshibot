@@ -94,6 +94,8 @@ cities, checked against the Kalshi API that day.
 
 ## Commodities (gold and silver)
 
+**Off since 2026-10-19, at your request** (`live_trading = false` in `[commodities]`). It made -$2.34 over its first week. The scheduled runs no longer start the metals loop.
+
 Added 2026-10-11 at your request. `kalshibot/commodities.py` trades Kalshi's gold and
 silver price markets (15-minute, hourly and daily), checking every minute while metals
 markets are open. Its settings are the `[commodities]` section of `rules.toml`;
